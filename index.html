@@ -11587,6 +11587,56 @@ const _dkToggleGlass=toggleGlass;
 toggleGlass=function(ev){ _dkToggleGlass(ev); const p=$('glass-pop'); if(p&&!$('gp-dock')){ p.insertAdjacentHTML('beforeend','<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;cursor:pointer"><input type="checkbox" id="gp-dock" onchange="setDock(this.checked)"> Floating glass navbar</label>'); } if($('gp-dock')) $('gp-dock').checked=dockOn(); };
 applyDock();
 
+// ═══════════════════════════════════════════════════
+// REFEREE THANK-YOU LOCK — right after a FINAL submit from a QR/link phone,
+// the entry form closes and a Thank-you screen is shown (no more editing).
+// Provisional saves ("Final" unticked) keep the form open on purpose.
+// Corrections: control room uses Events → Reopen (creates a new QR).
+// ═══════════════════════════════════════════════════
+let _refTyTimer=null;
+function refThankYou(id){
+  const ev=eventById(getStore(),id); const name=ev?ev.name:'';
+  const link=getSync().mode!=='firebase';
+  if(link){
+    // Link mode: results still have to go by WhatsApp → keep the send panel, but lock all inputs
+    refResend(id);
+    setTimeout(()=>{ const p=$('ref-result-panel'); if(!p||$('ref-ty-banner')) return;
+      p.insertAdjacentHTML('afterbegin',`<div id="ref-ty-banner" style="padding:22px 16px;text-align:center;border:1px solid var(--green);border-radius:12px;margin-bottom:14px;background:rgba(0,230,118,.06)">
+        <div style="font-size:46px">🙏</div>
+        <div style="font-family:'Teko',sans-serif;font-size:28px;letter-spacing:2px;color:var(--green)">THANK YOU!</div>
+        <div style="font-size:14px;color:#c9d1d9;line-height:1.5">Results for <b>${esc(name)}</b> are saved and locked.<br>Last step: tap <b>Send on WhatsApp</b> below.</div></div>`);
+      p.scrollIntoView({behavior:'smooth',block:'start'}); },260);
+    return;
+  }
+  _refLocked=-1; lockReferee(); $('ref-event-selector').style.display='block'; $('ref-result-panel').style.display='none';
+  $('ref-event-list').innerHTML=`<div style="padding:40px 20px;text-align:center"><div style="font-size:56px;margin-bottom:6px">🙏</div>
+    <div style="font-family:'Teko',sans-serif;font-size:32px;letter-spacing:2px;color:var(--green);margin-bottom:6px">THANK YOU!</div>
+    <div style="font-size:15px;color:#c9d1d9;line-height:1.5">Results for <b>${esc(name)}</b> have been submitted.<br>Entry is now locked.</div>
+    <div id="ref-ty-status" style="margin-top:16px;font-size:14px;font-weight:700"></div>
+    <div style="font-size:12px;color:#8b949e;margin-top:14px">Need a correction? Ask the control room to reopen this event.</div></div>`;
+  document.querySelector('#ref-event-selector > div')?.style.setProperty('display','none'); setText('ref-event-badge','SUBMITTED');
+  const tick=()=>{ const el=$('ref-ty-status'); if(!el){ clearInterval(_refTyTimer); return; }
+    const n=Object.keys(outbox()).filter(k=>k.startsWith('inbox/')).length;
+    el.style.color=n?'var(--gold)':'var(--green)';
+    el.textContent=n?'⏳ Sending to control room… keep this page open until this turns green.':'✅ Received by the control room. You can close this page.'; };
+  clearInterval(_refTyTimer); tick(); _refTyTimer=setInterval(tick,1500);
+}
+submitRefereeResults=(function(orig){ return function(){
+  const id=_refEventId, finalOn=$('rp-final')?.checked!==false;
+  const r=orig.apply(this,arguments);
+  if(id==null||!finalOn||!new URLSearchParams(location.search).has('eid')||isControlBrowser()) return r;
+  setTimeout(()=>{ // only when the submit really went through (not cancelled / not a validation error)
+    const ok=[...document.querySelectorAll('#referee-screen button')].some(x=>/SUBMITTED/.test(x.textContent));
+    if(!ok) return;
+    try{ localStorage.setItem(refDoneKey(id),String(Date.now())); }catch{}
+    refThankYou(id);
+  },300);
+  return r; }; })(submitRefereeResults);
+// a phone re-opening a submitted link sees the same Thank-you screen (Live Sync)
+refClosedScreen=(function(orig){ return function(id,title,msg,allowResend){
+  if(title==='RESULTS SUBMITTED'&&getSync().mode==='firebase') return refThankYou(id);
+  return orig.apply(this,arguments); }; })(refClosedScreen);
+
 handleUrlParams();
 </script>
 <!-- PWA: offline + install. Only runs when hosted (http/https), never from a local file. -->
