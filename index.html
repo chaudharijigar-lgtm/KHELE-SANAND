@@ -3769,6 +3769,7 @@ body:has(#referee-screen.active) .toast-container{top:calc(10px + env(safe-area-
 }
 html body.ops-glass:not(.ops-light) #admin-screen .data-table tr:hover td{background:rgba(255,255,255,.06)!important}
 </style>
+<style id="perf-css">/* perf: running clocks change only their own box (no full-page relayout) */.hero-elapsed{contain:size layout style;height:1.17em;line-height:1.17;min-width:4.3em}#a-elapsed,#fv-timer,#d-clock,#a-clock,#ws-clock,#ws-bottom-clock,#fv-clock{font-variant-numeric:tabular-nums;contain:layout paint}</style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0a0b0c">
 <meta name="mobile-web-app-capable" content="yes">
@@ -5066,7 +5067,7 @@ html body.ops-glass:not(.ops-light) #admin-screen .data-table tr:hover td{backgr
 function pad(n,d=2){ return String(Math.floor(n)).padStart(d,'0'); }
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function $(id){ return document.getElementById(id); }
-function setText(id,v){ const el=$(id); if(el) el.textContent=v; }
+function setText(id,v){ const el=$(id); if(!el) return; const t=v==null?'':String(v); if(el.textContent===t) return; const f=el.firstChild; if(f&&f.nodeType===3&&!f.nextSibling) f.nodeValue=t; else el.textContent=t; } // skip unchanged text; update text node in place (no page-wide re-scans)
 // Parse a track time: "21.34", "21.34s", "1:02.34", "1:02:03.5" → seconds
 function parseTime(v){
   if(v==null) return NaN;
@@ -6422,8 +6423,9 @@ function updateTimerUI(){
   const el3=$('a-status-text');
   if(el3){
     const s=getStore(); const st=eventById(s,s.liveEventId)?.status;
-    el3.textContent=_localTimer.running?'RUNNING':st==='delayed'?'DELAYED':!s.liveEventId?'STANDBY':elapsedMs()>0?'PAUSED':'READY';
-    el3.style.color=_localTimer.running?'var(--green)':st==='delayed'?'var(--red)':'var(--gold)';
+    const t3=_localTimer.running?'RUNNING':st==='delayed'?'DELAYED':!s.liveEventId?'STANDBY':elapsedMs()>0?'PAUSED':'READY';
+    if(el3.textContent!==t3) el3.textContent=t3;
+    const c3=_localTimer.running?'var(--green)':st==='delayed'?'var(--red)':'var(--gold)'; if(el3.style.color!==c3) el3.style.color=c3;
   }
 }
 let _lastSec=-1, _tickN=0;
@@ -6755,7 +6757,7 @@ window.addEventListener('storage',e=>{
 const _baseSaveStore=saveStore;
 saveStore=function(s){ _baseSaveStore(s); if(isActive('focus-screen')) refreshFocusInPlace(); };
 // live timer + periodic refresh (countdowns, auto mode)
-setInterval(()=>{ if(isActive('focus-screen')){ const t=$('fv-timer'); if(t) t.textContent=fmtElapsed(elapsedMs()); setText('fv-clock',$('d-clock')?.textContent||''); } },100);
+setInterval(()=>{ if(isActive('focus-screen')){ setText('fv-timer',fmtElapsed(elapsedMs())); setText('fv-clock',$('d-clock')?.textContent||''); } },100);
 setInterval(()=>{ applyDisplay(); if(isActive('led-screen')) renderDashboard(); if(isActive('focus-screen')) refreshFocusInPlace(); },30000);
 applyDisplay();
 
@@ -10060,7 +10062,7 @@ function pubPayload(s){
 }
 let _pubSig='', _pubT=null;
 const _f4PushState=pushState;
-pushState=function(){ _f4PushState(); if(!canWriteRoom()||_applyingRemote) return; clearTimeout(_pubT); _pubT=setTimeout(()=>{ const d=pubPayload(getStore()), sig=cyrb53(JSON.stringify(d)); if(sig!==_pubSig){ _pubSig=sig; queue('pub/data',d); queue('pub/v',Date.now()); } },1500); };
+pushState=function(){ _f4PushState(); if(!canWriteRoom()||_applyingRemote) return; clearTimeout(_pubT); _pubT=setTimeout(()=>{ const d=pubPayload(getStore()), sig=cyrb53(JSON.stringify(d)); if(sig!==_pubSig){ _pubSig=sig; queue('pub/data',d); queue('pub/v',Date.now()); } },700); };
 let _pubPollT=null, _pubV=null;
 async function pollPublic(){
   try{
@@ -10080,7 +10082,7 @@ function applyPublicFeed(d){
   if(!_firstData){ _firstData=true; _onFirstData.splice(0).forEach(f=>{ try{ f(); }catch{} }); }
   if(isActive('public-screen')) renderPublic();
 }
-function startPublicPoll(){ stopPublicPoll(); syncClock(); pollPublic(); _pubPollT=setInterval(pollPublic,8000+Math.round(Math.random()*4000)); }
+function startPublicPoll(){ stopPublicPoll(); syncClock(); pollPublic(); _pubPollT=setInterval(pollPublic,4000+Math.round(Math.random()*2000)); /* tiny request; results reach spectators within ~5 s */ }
 function stopPublicPoll(){ if(_pubPollT){ clearInterval(_pubPollT); _pubPollT=null; } }
 const _f4Connect=connectSync;
 connectSync=async function(){
@@ -11618,7 +11620,7 @@ function refThankYou(id){
   const tick=()=>{ const el=$('ref-ty-status'); if(!el){ clearInterval(_refTyTimer); return; }
     const n=Object.keys(outbox()).filter(k=>k.startsWith('inbox/')).length;
     el.style.color=n?'var(--gold)':'var(--green)';
-    el.textContent=n?'⏳ Sending to control room… keep this page open until this turns green.':'✅ Received by the control room. You can close this page.'; };
+    el.textContent=n?'⏳ Sending to control room… keep this page open until this turns green.':'✅ Sent to the control room. You can close this page.'; };
   clearInterval(_refTyTimer); tick(); _refTyTimer=setInterval(tick,1500);
 }
 submitRefereeResults=(function(orig){ return function(){
@@ -11636,6 +11638,78 @@ submitRefereeResults=(function(orig){ return function(){
 refClosedScreen=(function(orig){ return function(id,title,msg,allowResend){
   if(title==='RESULTS SUBMITTED'&&getSync().mode==='firebase') return refThankYou(id);
   return orig.apply(this,arguments); }; })(refClosedScreen);
+
+// ═══════════════════════════════════════════════════
+// LIVE SYNC WATCHDOG — after a network drop or a database error the browser
+// closes the live connection for good; this reconnects automatically
+// (3s → 6s → 12s … max 30s), and also when the internet comes back.
+// ═══════════════════════════════════════════════════
+openStream=(function(orig){ return function(){
+  const es=orig.apply(this,arguments); es._last=Date.now();
+  const mark=()=>{ es._last=Date.now(); };
+  ['open','put','patch','keep-alive'].forEach(t=>es.addEventListener(t,mark));
+  return es; }; })(openStream);
+let _wdFails=0, _wdNext=0, _wdBusy=false;
+async function syncWatchdog(){
+  const c=getSync(); if(c.mode!=='firebase'||c.role==='public'||!c.dbUrl||!c.room||_wdBusy||_syncStatus==='connecting') return; // spectators poll, they have no live connection
+  const now=Date.now();
+  const dead=!_streams.length||_streams.some(s=>s.readyState===2||(s.readyState===1&&now-(s._last||0)>180000));
+  if(!dead){ _wdFails=0; return; }
+  if(now<_wdNext) return;
+  _wdBusy=true;
+  try{ await connectSync(); }catch(e){ setSyncStatus('error','Reconnecting… '+(e&&e.message||'')); }
+  finally{ _wdBusy=false; _wdFails++; _wdNext=Date.now()+Math.min(30000,3000*Math.pow(2,Math.min(_wdFails-1,4))); }
+}
+setInterval(syncWatchdog,3000);
+window.addEventListener('online',()=>{ _wdNext=0; setTimeout(syncWatchdog,500); });
+
+// ═══════════════════════════════════════════════════
+// RESULT SAFETY FIXES (Nov 2026)
+// 1) "1:75.00" is not a valid time (seconds must be under 60)
+// 2) impossible times (e.g. "123" typed for 12.3 → 1.23 s) are flagged "?" and not ranked
+// 3) field events: athletes with exactly the same series share the same place
+// 4) backups also carry the waiting-screen images
+// ═══════════════════════════════════════════════════
+parseTime=(function(orig){ return function(v){
+  const t=orig(v); if(isNaN(t)) return t;
+  const parts=String(v).trim().replace(/s$/i,'').replace(/,/g,'.').split(':');
+  if(parts.length>1&&parts.slice(1).some(p=>Number(p)>=60)) return NaN;
+  return t; }; })(parseTime);
+function raceDistance(name){
+  const n=String(name||'');
+  const relay=n.match(/(\d)\s*[x×]\s*(\d{2,4})\s*m?/i); if(relay) return (+relay[1])*(+relay[2]);
+  const m=n.match(/(?:^|[^\d-])(\d{2,5})\s*m(?:\b|tr|etre|eter)/i); return m?+m[1]:0;
+}
+function minPlausibleTime(evName){ const d=raceDistance(evName); return d?d/11:0; } // faster than 11 m/s is not humanly possible
+buildTrackEntries=(function(orig){ return function(athletes,getVal){
+  const evName=athletes[0]&&athletes[0].event; const floor=minPlausibleTime(evName);
+  if(!floor) return orig.apply(this,arguments);
+  return orig.call(this,athletes,a=>{ const v=getVal(a)||{}; const r=fmtTimeInput(String(v.result||'').trim());
+    const t=parseTime(r); if(r&&!isNaN(t)&&t<floor) return Object.assign({},v,{result:r+'?'}); return v; });
+}; })(buildTrackEntries);
+buildFieldEntries=(function(orig){ return function(athletes,getTrials){
+  const entries=orig.apply(this,arguments);
+  if(entries.some(e=>e.v)) return entries; // vertical jumps already handle ties
+  const series=e=>[1,2,3].map(n=>(e['s'+n]==='foul'||e['s'+n]==='pass')?NaN:parseMark(e['t'+n])).filter(x=>!isNaN(x)).sort((x,y)=>y-x).join('|');
+  const ranked=entries.filter(e=>e.rank<999).sort((a,b)=>a.rank-b.rank);
+  ranked.forEach((e,i)=>{ const p=ranked[i-1]; e.rank=(p&&series(p)===series(e))?p.rank:i+1; });
+  return entries; }; })(buildFieldEntries);
+backupFile=(function(orig){ return function(data,tag){ const imgs=getImages(); if(imgs.length) data.__images=imgs; return orig.apply(this,arguments); }; })(backupFile);
+migrate=(function(orig){ return function(s){ if(s&&Array.isArray(s.__images)){ if(s.__images.length) saveImages(s.__images); delete s.__images; } return orig.apply(this,arguments); }; })(migrate);
+
+// ═══════════════════════════════════════════════════
+// READINESS CHECKLIST — technical health items (offline copy, unsent results, storage space)
+// ═══════════════════════════════════════════════════
+function storageUsedPct(){ let n=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); n+=k.length+(localStorage.getItem(k)||'').length; } }catch{} return Math.round(n/5000000*100); }
+checklist=(function(orig){ return function(){
+  const list=orig.apply(this,arguments); const c=getSync();
+  if(/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator){
+    const sw=!!navigator.serviceWorker.controller;
+    list.push({ok:sw,t:sw?'Offline copy installed — the app opens even without internet':'Offline copy not ready yet — reload this page once while online',fix:'location.reload()'});
+  }
+  if(c.mode==='firebase'){ const n=Object.keys(outbox()).length; list.push({ok:!n,t:n?`${n} update(s) still waiting to be sent — check the internet`:'All updates delivered (nothing waiting to send)',fix:'flushOutbox()'}); }
+  const pct=storageUsedPct(); list.push({ok:pct<70,t:`Browser storage ${pct}% used${pct>=70?' — remove some waiting-screen images':''}`,fix:`showPage('page-waiting',document.querySelector('.nav-item[onclick*=page-waiting]'))`});
+  return list; }; })(checklist);
 
 handleUrlParams();
 </script>
