@@ -7750,13 +7750,21 @@ async function readXlsx(file){
   }catch{}
   const sheet=await get(sheetPath); if(!sheet) throw new Error('Could not find a worksheet in this file');
   const colIdx=ref=>{ const L=ref.replace(/\d+/g,''); let n=0; for(const ch of L) n=n*26+(ch.charCodeAt(0)-64); return n-1; };
+  // photo links hidden behind a hyperlink (cell shows "Photo" but links to Drive) → use the link itself
+  const PHOTO_URL=/drive\.google\.com|docs\.google\.com|googleusercontent\.com|\.(jpe?g|png|webp)(\?|$)/i, links={};
+  try{ const sdoc=xml(sheet), relPath=sheetPath.replace(/([^/]+)$/,'_rels/$1.rels'), srel=await get(relPath);
+    const relMap={}; if(srel) [...xml(srel).getElementsByTagName('Relationship')].forEach(r=>relMap[r.getAttribute('Id')]=r.getAttribute('Target'));
+    [...sdoc.getElementsByTagName('hyperlink')].forEach(h=>{ const id=h.getAttribute('r:id')||h.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id'); const u=relMap[id]; if(u&&PHOTO_URL.test(u)) links[h.getAttribute('ref')]=u; });
+  }catch{}
   const rows=[];
   xml(sheet).querySelectorAll('sheetData row').forEach(r=>{
     const row=[];
     r.querySelectorAll('c').forEach(c=>{
       const t=c.getAttribute('t'), v=c.getElementsByTagName('v')[0]?.textContent;
       let val=t==='s'?ss[+v]:t==='inlineStr'?[...c.getElementsByTagName('t')].map(x=>x.textContent).join(''):t==='b'?(v==='1'?'TRUE':'FALSE'):(v??'');
-      row[colIdx(c.getAttribute('r'))]=val;
+      const ref=c.getAttribute('r'), fx=c.getElementsByTagName('f')[0]?.textContent||'', hm=fx.match(/HYPERLINK\(\s*"([^"]+)"/i);
+      if(links[ref]&&!PHOTO_URL.test(String(val))) val=links[ref]; else if(hm&&PHOTO_URL.test(hm[1])) val=hm[1];
+      row[colIdx(ref)]=val;
     });
     rows.push(Array.from(row,x=>x==null?'':String(x).trim()));
   });
@@ -11729,7 +11737,7 @@ checklist=(function(orig){ return function(){
 // The photo is downloaded and saved small on this laptop (works offline); if Google blocks that,
 // the link itself is kept and the photo shows whenever the device is online.
 // ═══════════════════════════════════════════════════
-ATH_FIELDS.push({k:'photo',label:'Photo link',w:160,al:['photo','photolink','photourl','photodrivelink','drivelink','drivephoto','image','imagelink','imageurl','picture','pic','photograph']});
+ATH_FIELDS.push({k:'photo',label:'Photo link',w:160,al:['photo','photolink','photourl','photodrivelink','drivelink','drivephoto','image','imagelink','imageurl','picture','pic','photograph','uploadphoto','athletephoto','passportphoto','photoupload']});
 function driveId(u){ const s=String(u||'').trim();
   const m=s.match(/drive\.google\.com\/file\/d\/([\w-]{10,})/)||s.match(/drive\.google\.com\/(?:open|uc|thumbnail)\?(?:[^#]*&)?id=([\w-]{10,})/)||s.match(/docs\.google\.com\/uc\?(?:[^#]*&)?id=([\w-]{10,})/)||s.match(/googleusercontent\.com\/d\/([\w-]{10,})/);
   return m?m[1]:null; }
@@ -11740,29 +11748,100 @@ function photoSources(u){ const s=String(u||'').trim(), id=driveId(s);
 function loadImg(src,cors){ return new Promise((res,rej)=>{ const im=new Image(); if(cors) im.crossOrigin='anonymous'; im.referrerPolicy='no-referrer';
   const t=setTimeout(()=>{ im.src=''; rej(new Error('timeout')); },20000);
   im.onload=()=>{ clearTimeout(t); (im.naturalWidth>1?res:rej)(im); }; im.onerror=()=>{ clearTimeout(t); rej(new Error('load')); }; im.src=src; }); }
+function driveKey(){ try{ return (localStorage.getItem('ks_drive_key')||getSync().apiKey||'').trim(); }catch{ return ''; } }
+function setDriveKey(){ const k=prompt('Google API key for Drive photos (starts with AIza…).\nLeave empty to use the Firebase Web API key.',localStorage.getItem('ks_drive_key')||''); if(k===null) return false;
+  try{ k.trim()?localStorage.setItem('ks_drive_key',k.trim()):localStorage.removeItem('ks_drive_key'); }catch{} toast('Drive photo key saved','success'); return true; }
+async function blobToPhoto(blob){
+  if(/heic|heif/i.test(blob.type||'')) throw new Error('iPhone HEIC photo — save it as JPG first');
+  let src; try{ src=await createImageBitmap(blob); }catch{ const u=URL.createObjectURL(blob); try{ src=await loadImg(u,false); }catch{ throw new Error('not an image (JPG / PNG needed)'); } finally{ setTimeout(()=>URL.revokeObjectURL(u),2000); } }
+  return cropToPhoto(src); }
+// Official Google Drive API — works from any website for files shared "Anyone with the link"
+async function driveApiPhoto(id,key){
+  let r; try{ r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&key=${encodeURIComponent(key)}`); }catch{ throw new Error('no internet / Google not reachable'); }
+  if(r.ok) return blobToPhoto(await r.blob());
+  let txt=''; try{ const j=await r.json(); const e=j.error||{}; txt=[e.message,e.status,...(e.errors||[]).map(x=>x.reason)].join(' '); }catch{}
+  const err=m=>{ const e=new Error(m); return e; };
+  if(/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(txt)){ const e=err('Google Drive API is not switched on for this key'); e.setup=true; throw e; }
+  if(/API_KEY_SERVICE_BLOCKED|are blocked|keyInvalid|API key not valid|referer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(txt)){ const e=err('this API key is not allowed to use Google Drive'); e.setup=true; throw e; }
+  if(r.status===404) throw err('not found — share it as “Anyone with the link” (not only your organisation)');
+  if(r.status===403) throw err('Google refused — share it as “Anyone with the link”');
+  throw err('Google error '+r.status); }
 async function fetchPhoto(u){
-  const srcs=photoSources(u); if(!srcs.length) throw new Error(/folders\//.test(u)?'folder link — use each photo’s own link':'not a photo link');
-  for(const src of srcs){ try{ return cropToPhoto(await loadImg(src,true)); }catch(e){} }      // saved copy (offline-safe)
-  for(const src of srcs){ try{ await loadImg(src,false); return src; }catch(e){} }            // link only
-  throw new Error('not shared publicly (Anyone with the link)'); }
+  const s=String(u||'').trim(), id=driveId(s);
+  if(!id&&/drive\.google\.com\/drive\/folders\//.test(s)) throw new Error('folder link — use each photo’s own link (or upload the folder as ZIP)');
+  let firstErr=null;
+  if(id){ const key=driveKey();
+    if(key){ try{ return await driveApiPhoto(id,key); }catch(e){ firstErr=e; } }
+    else firstErr=Object.assign(new Error('no Google API key set for Drive photos'),{setup:true});
+    for(const src of [`https://drive.google.com/thumbnail?id=${id}&sz=w600`,`https://lh3.googleusercontent.com/d/${id}=w600`]){ try{ return cropToPhoto(await loadImg(src,true)); }catch{} }
+    for(const src of [`https://drive.google.com/thumbnail?id=${id}&sz=w600`,`https://lh3.googleusercontent.com/d/${id}=w600`]){ try{ await loadImg(src,false); return src; }catch{} }
+    throw firstErr||new Error('not shared publicly (Anyone with the link)'); }
+  if(!/^https?:\/\/\S+$/i.test(s)) throw new Error('not a photo link');
+  try{ return cropToPhoto(await loadImg(s,true)); }catch{}
+  try{ await loadImg(s,false); return s; }catch{}
+  throw new Error('photo could not be opened'); }
 let _photoJob=null;
 function photoJobBox(html){ let b=$('photo-job'); if(!b){ b=document.createElement('div'); b.id='photo-job';
-    b.style.cssText='position:fixed;left:16px;bottom:16px;z-index:9999;max-width:min(420px,calc(100vw - 32px));background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:10px;padding:12px 14px;font:13px/1.45 Barlow,Arial,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+    b.style.cssText='position:fixed;left:16px;bottom:16px;z-index:9999;max-width:min(440px,calc(100vw - 32px));background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:10px;padding:12px 14px;font:13px/1.45 Barlow,Arial,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
     document.body.appendChild(b); }
   b.innerHTML=html; return b; }
+const DRIVE_SETUP_HELP=`<div style="font-size:12px;color:#c9d1d9;margin-top:6px;background:#0d1117;border-radius:6px;padding:8px 10px;line-height:1.6"><b style="color:var(--gold)">One-time setup (3 min):</b><br>
+1. Open <b>console.cloud.google.com</b> → top bar: pick your <b>Firebase project</b>.<br>
+2. <i>APIs &amp; Services → Library</i> → search <b>Google Drive API</b> → <b>Enable</b>.<br>
+3. <i>APIs &amp; Services → Credentials</i> → open the <b>Browser key</b> → if “API restrictions” is on, tick <b>Google Drive API</b> too → Save. (Or <i>Create credentials → API key</i>.)<br>
+4. Press <b>🔑 Key</b> below (empty = use the Firebase key) → <b>Retry</b>.</div>`;
 async function runPhotoJob(list){
   if(!list.length) return; if(_photoJob) _photoJob.cancel=true;
-  const job=_photoJob={cancel:false}; let done=0, saved=0, linked=0; const failed=[];
+  const job=_photoJob={cancel:false,failedItems:[]}; let done=0, saved=0, linked=0, setup=false; const failed=[];
   const draw=()=>photoJobBox(`📷 <b>Athlete photos</b> — ${done}/${list.length}<div style="height:6px;background:#30363d;border-radius:3px;margin:6px 0"><div style="height:6px;width:${Math.round(done/list.length*100)}%;background:var(--green);border-radius:3px"></div></div><span style="color:#8b949e">You can keep working.</span> <button class="btn xs" onclick="_photoJob&&(_photoJob.cancel=true)">Stop</button>`);
   draw(); let i=0;
   const worker=async()=>{ while(i<list.length&&!job.cancel){ const it=list[i++];
       try{ const d=await fetchPhoto(it.url); if(job.cancel) break; PhotoDB.put(it.key,d); d.startsWith('data:')?saved++:linked++; }
-      catch(e){ failed.push(`${it.name}: ${e.message}`); }
+      catch(e){ failed.push(`${it.name}: ${e.message}`); job.failedItems.push(it); if(e.setup) setup=true; }
       done++; draw(); } };
   await Promise.all([worker(),worker(),worker()]);
   afterPhotoChange(); if(_photoJob===job) _photoJob=null;
-  photoJobBox(`📷 <b>Athlete photos ${job.cancel?'stopped':'done'}</b><br>✅ ${saved} saved on this laptop${linked?`<br>🔗 ${linked} saved as link (show when online)`:''}${failed.length?`<br><span style="color:var(--red)">❌ ${failed.length} not loaded</span><div style="max-height:140px;overflow:auto;font-size:12px;color:#8b949e;margin-top:4px">${failed.map(esc).join('<br>')}</div><div style="font-size:12px;margin-top:4px">Fix: Drive → Share → <b>Anyone with the link</b>, then import again.</div>`:''}<div style="text-align:right;margin-top:8px"><button class="btn xs" onclick="this.closest('#photo-job').remove()">Close</button></div>`);
+  window._photoRetry=job.failedItems;
+  photoJobBox(`📷 <b>Athlete photos ${job.cancel?'stopped':'done'}</b><br>✅ ${saved} saved on this laptop${linked?`<br>🔗 ${linked} saved as link (show only when online)`:''}${failed.length?`<br><span style="color:var(--red)">❌ ${failed.length} not loaded</span><div style="max-height:130px;overflow:auto;font-size:12px;color:#8b949e;margin-top:4px">${failed.map(esc).join('<br>')}</div>${setup?DRIVE_SETUP_HELP:'<div style="font-size:12px;margin-top:4px">Fix: Drive → Share → General access → <b>Anyone with the link</b>, then Retry. Or upload the photos as a ZIP (Athletes → 🖼 Photos ZIP).</div>'}`:''}
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap">${failed.length?`<button class="btn xs" onclick="setDriveKey()">🔑 Key</button><button class="btn xs primary" onclick="runPhotoJob(window._photoRetry||[])">↻ Retry ${failed.length}</button>`:''}<button class="btn xs" onclick="this.closest('#photo-job').remove()">Close</button></div>`);
 }
+// ── Photos from a ZIP / many image files: matched by file name = bib number or athlete name ──
+function photoMatch(fname,s){
+  const base=String(fname).split('/').pop().replace(/\.[a-z0-9]{2,5}$/i,'').trim();
+  const parts=[base,...base.split(/\s+-\s+|_+|\s*\(\d+\)\s*$/)].map(x=>x.trim()).filter(Boolean);
+  for(const p of parts){
+    const byBib=s.athletes.filter(a=>a.bib&&String(a.bib).toLowerCase()===p.toLowerCase()); if(byBib.length) return byBib;
+    const nk=normKey(p); if(nk.length<3) continue;
+    const byName=s.athletes.filter(a=>normKey(a.name)===nk); if(byName.length) return byName;
+  } return []; }
+async function importPhotoFiles(ev){
+  const files=[...(ev.target.files||[])]; ev.target.value=''; if(!files.length) return;
+  photoJobBox('📷 <b>Reading photos…</b>');
+  const items=[];
+  for(const f of files){
+    if(/\.zip$/i.test(f.name)){ let z; try{ z=fflate.unzipSync(new Uint8Array(await f.arrayBuffer())); }catch{ toast('Could not open '+f.name,'error'); continue; }
+      Object.entries(z).forEach(([n,b])=>{ if(/(^|\/)__MACOSX\/|\/$/.test(n)||!b.length) return; if(!/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(n)) return;
+        const ext=n.split('.').pop().toLowerCase(); items.push({name:n,blob:new Blob([b],{type:/heic|heif/.test(ext)?'image/heic':ext==='png'?'image/png':ext==='webp'?'image/webp':ext==='gif'?'image/gif':'image/jpeg'})}); }); }
+    else if(/^image\//.test(f.type)||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) items.push({name:f.name,blob:f});
+  }
+  if(!items.length){ photoJobBox('📷 No photos found (JPG / PNG, or a ZIP of them). <button class="btn xs" onclick="this.closest(\'#photo-job\').remove()">Close</button>'); return; }
+  const s=getStore(); let saved=0; const unmatched=[], bad=[], amb=[];
+  for(let i=0;i<items.length;i++){ const it=items[i];
+    if(i%5===0) photoJobBox(`📷 <b>Matching photos</b> — ${i}/${items.length}`);
+    const hits=photoMatch(it.name,s); const keys=[...new Set(hits.map(photoKey))];
+    if(!hits.length){ unmatched.push(it.name.split('/').pop()); continue; }
+    if(keys.length>1){ amb.push(it.name.split('/').pop()); continue; }
+    try{ PhotoDB.put(keys[0],await blobToPhoto(it.blob)); saved++; }catch(e){ bad.push(it.name.split('/').pop()+': '+e.message); }
+    await new Promise(r=>setTimeout(r,0)); }
+  afterPhotoChange();
+  const list=(t,arr)=>arr.length?`<br><span style="color:var(--gold)">${t} (${arr.length})</span><div style="max-height:90px;overflow:auto;font-size:12px;color:#8b949e">${arr.map(esc).join('<br>')}</div>`:'';
+  photoJobBox(`📷 <b>Photos imported</b><br>✅ ${saved} athlete photo(s) saved on this laptop${list('No athlete with this bib / name',unmatched)}${list('Same name in more than one athlete — rename file to the bib number',amb)}${list('Could not read',bad)}
+    <div style="font-size:12px;color:#8b949e;margin-top:6px">Tip: name each photo by <b>bib number</b> (e.g. <b>101.jpg</b>) or the athlete’s full name.</div><div style="text-align:right;margin-top:8px"><button class="btn xs" onclick="this.closest('#photo-job').remove()">Close</button></div>`);
+}
+// button next to "Bulk Add Athletes"
+function addPhotoZipButton(){ const b=document.querySelector('button[onclick="openBulk(\'athletes\')"]'); if(!b||$('photo-zip-btn')) return;
+  b.insertAdjacentHTML('afterend',`<label class="btn" id="photo-zip-btn" title="Upload a ZIP (or many JPG files) — photos are matched by bib number or athlete name" style="position:relative;overflow:hidden">🖼 Photos ZIP<input type="file" accept=".zip,image/*" multiple onchange="importPhotoFiles(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>`); }
+setTimeout(addPhotoZipButton,800); setInterval(addPhotoZipButton,3000);
 bulkImport=(function(orig){ return function(){
   const want=_bulk.kind==='athletes'?(_bulk.preview||[]).filter(r=>['ok','warn','upd'].includes(r.status)&&r.data&&String(r.data.photo||'').trim()).map(r=>r.data):[];
   const r=orig.apply(this,arguments);
