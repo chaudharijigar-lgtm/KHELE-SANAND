@@ -3,7 +3,7 @@
    - Page is always fetched fresh when online (network-first), so updates show up.
    - Firebase / any other website is NEVER touched by this worker (live data stays live).
    To push an update: change VERSION below, upload files again. */
-const VERSION = 'ks-2026-v4';
+const VERSION = 'ks-2026-v6';
 const APP_FILES = [
   './',
   './index.html',

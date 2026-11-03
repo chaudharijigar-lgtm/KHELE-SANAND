@@ -5067,6 +5067,18 @@ html body.ops-glass:not(.ops-light) #admin-screen .data-table tr:hover td{backgr
 function pad(n,d=2){ return String(Math.floor(n)).padStart(d,'0'); }
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function $(id){ return document.getElementById(id); }
+// Result for display in Olympic / World Athletics style:
+//   track: 9.58 · 47.32 · 1:43.25 · 27:43.22 · 2:01:09 (no leading zeros; 1/1000 rounds UP to the next 1/100, hand times keep 1/10)
+//   field: "8.95m" → "8.95 m"
+function resTxt(v){ const t=String(v==null?'':v).trim(); if(!t) return '';
+  const m=t.match(/^(\d+(?:\.\d+)?)\s*m$/i); if(m) return m[1]+' m';
+  if(!/^\d+(?::\d{1,2}){0,2}(?:\.\d+)?$/.test(t)) return t;
+  let sec=parseTime(t); if(isNaN(sec)) return t;
+  let dp=(t.split('.')[1]||'').length;
+  if(dp>2){ sec=Math.ceil(Math.round(sec*1000)/10)/100; dp=2; }
+  const cs=Math.round(sec*Math.pow(10,dp)), unit=Math.pow(10,dp), w=Math.floor(cs/unit), fr=dp?'.'+String(cs%unit).padStart(dp,'0'):'';
+  const h=Math.floor(w/3600), mi=Math.floor(w%3600/60), se=w%60, p2=n=>String(n).padStart(2,'0');
+  return h?`${h}:${p2(mi)}:${p2(se)}${fr}`:mi?`${mi}:${p2(se)}${fr}`:`${se}${fr}`; }
 function setText(id,v){ const el=$(id); if(!el) return; const t=v==null?'':String(v); if(el.textContent===t) return; const f=el.firstChild; if(f&&f.nodeType===3&&!f.nextSibling) f.nodeValue=t; else el.textContent=t; } // skip unchanged text; update text node in place (no page-wide re-scans)
 // Parse a track time: "21.34", "21.34s", "1:02.34", "1:02:03.5" → seconds
 function parseTime(v){
@@ -5327,7 +5339,7 @@ function renderDashboard(){
       return `<div class="res-row">
         <div class="rk ${cls}">${rankLabel(r)}</div>
         <div><div class="at-name">${esc(r.name)}</div><div class="at-sub">${esc(r.team)} · #${esc(r.bib||r.lane||'—')}</div></div>
-        <div><div class="res-time${r.rank===1?' best':''}">${esc(r.result||'—')}</div><div style="text-align:right;margin-top:1px">${flagBadge(r)}</div></div>
+        <div><div class="res-time${r.rank===1?' best':''}">${esc(resTxt(r.result)||'—')}</div><div style="text-align:right;margin-top:1px">${flagBadge(r)}</div></div>
         <div style="text-align:center;font-size:20px">${r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div>
       </div>`;
     }).join('');
@@ -5370,7 +5382,7 @@ function renderDashboard(){
   const cer=s.ceremony;
   const cerEl=$('d-ceremony');
   if(cer&&cer.event){
-    const place=(p,label,color)=>p&&p.name?`<div style="text-align:center;flex:1"><div style="font-family:'Teko',sans-serif;font-size:17px;font-weight:700;color:${color}">${esc(p.name)}</div><div style="font-size:10px;color:${color}">${label}${p.result?' · '+esc(p.result):''}</div>${p.team?`<div style="font-size:10px;color:var(--muted)">${esc(p.team)}</div>`:''}</div>`:'';
+    const place=(p,label,color)=>p&&p.name?`<div style="text-align:center;flex:1"><div style="font-family:'Teko',sans-serif;font-size:17px;font-weight:700;color:${color}">${esc(p.name)}</div><div style="font-size:10px;color:${color}">${label}${p.result?' · '+esc(resTxt(p.result)):''}</div>${p.team?`<div style="font-size:10px;color:var(--muted)">${esc(p.team)}</div>`:''}</div>`:'';
     cerEl.innerHTML=`<div style="background:rgba(0,230,118,0.06);border:1px solid rgba(0,230,118,0.15);border-radius:6px;padding:10px 12px">
       <div style="font-family:'Teko',sans-serif;font-size:17px;font-weight:600;color:var(--text);margin-bottom:5px">${esc(cer.event)}${cer.venue?` <span style="font-size:12px;color:var(--muted)">· ${esc(cer.venue)}</span>`:''}</div>
       <div style="display:flex;gap:8px">${place(cer.gold,'GOLD','var(--rank1)')}${place(cer.silver,'SILVER','var(--rank2)')}${place(cer.bronze,'BRONZE','var(--rank3)')}</div>
@@ -5380,7 +5392,7 @@ function renderDashboard(){
   }
   // Ticker (with fallback so the strip is never blank)
   let items=Object.entries(s.results).flatMap(([evName,rows])=>rows.filter(r=>r.result&&!r.dnf&&!r.dq&&r.rank<=3)
-    .map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) — ${r.result}${r.pb?' 🌟PB':r.sb?' SB':''}`));
+    .map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) — ${resTxt(r.result)}${r.pb?' 🌟PB':r.sb?' SB':''}`));
   if(items.length===0){
     items=[s.announcement||'Welcome to '+meetInfo().name, ...nextEvs.map(n=>`Coming up ${n.time}: ${n.name} @ ${n.venue}`)];
   }
@@ -5729,7 +5741,7 @@ function renderPublishedResults(){
           <div style="font-family:'Share Tech Mono',monospace;font-size:14px;color:${r.rank===1?'var(--rank1)':r.rank===2?'var(--rank2)':r.rank===3?'var(--rank3)':'var(--muted)'};width:24px">${rankLabel(r)}</div>
           <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--gold);width:48px">#${esc(r.bib||'—')}</div>
           <div style="flex:1;font-size:13px;font-weight:600">${esc(r.name)} <span style="color:#8b949e;font-weight:400">${esc(r.team)}</span></div>
-          <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--teal)">${esc(r.result||'—')}</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--teal)">${esc(resTxt(r.result)||'—')}</div>
           ${flagBadge(r)}
         </div>`).join('')}
     </div>`;
@@ -6625,7 +6637,7 @@ function liveResultSig(s){ const ev=eventById(s,s.liveEventId); return ev?ev.nam
 function resRowHtml(r){
   const g=r.rank===1?'g1':r.rank===2?'g2':r.rank===3?'g3':'';
   const flag=r.dq?['DQ','#ff2a00','#fff']:r.dns?['DNS','#ff2a00','#fff']:r.dnf?['DNF','#ff2a00','#fff']:r.pb?['PB','#00e050','#000']:r.sb?['SB','#00d8ff','#000']:null;
-  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(r.result||'—')}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
+  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(resTxt(r.result)||'—')}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
 }
 function buildFocusSlides(s){
   const d=getDisplay(), out=[];
@@ -6668,7 +6680,7 @@ function buildFocusSlides(s){
       ${md.map((m,i)=>`<div class="fv-medal"><span>${i+1}</span><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.team)}</div><span style="color:#ffd400">${m.g}</span><span>${m.s}</span><span style="color:#ff9a3c">${m.b}</span><span style="color:var(--teal)">${m.total}</span></div>`).join('')}`});
   }
   if(d.slides.ceremony&&s.ceremony&&s.ceremony.event){
-    const c=s.ceremony, col=(p,h,bg,num)=>p&&p.name?`<div class="col"><div class="who">${esc(p.name)}</div><div class="tm2">${esc([p.team,p.result].filter(Boolean).join(' · '))}</div><div class="blk" style="height:${h}vh;background:${bg}">${num}</div></div>`:'';
+    const c=s.ceremony, col=(p,h,bg,num)=>p&&p.name?`<div class="col"><div class="who">${esc(p.name)}</div><div class="tm2">${esc([p.team,resTxt(p.result)].filter(Boolean).join(' · '))}</div><div class="blk" style="height:${h}vh;background:${bg}">${num}</div></div>`:'';
     out.push({key:'ceremony',html:`<div class="fv-kicker">VICTORY CEREMONY${c.venue?' · '+esc(c.venue):''}</div><div class="fv-title">${esc(c.event)}</div>
       <div class="fv-pod">${col(c.silver,22,'#e6e6e6','2')}${col(c.gold,32,'#ffd400','1')}${col(c.bronze,15,'#ff9a3c','3')}</div>`});
   }
@@ -6693,7 +6705,7 @@ function renderFocus(reset){
   stage.innerHTML=_fvSlides.map((x,i)=>`<div class="fv-slide${i===_fvIdx?' on':''}">${x.html}</div>`).join('')+
     `<div class="fv-dots">${_fvSlides.map((x,i)=>`<b class="${i===_fvIdx?'on':''}"></b>`).join('')}</div>`;
   // bottom ticker
-  let items=Object.entries(s.results).flatMap(([evName,rows])=>rows.filter(r=>r.rank<=3&&!r.dnf&&!r.dq).map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) ${r.result}`));
+  let items=Object.entries(s.results).flatMap(([evName,rows])=>rows.filter(r=>r.rank<=3&&!r.dnf&&!r.dq).map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) ${resTxt(r.result)}`));
   if(!items.length) items=[s.announcement||'Welcome to '+meetInfo().name];
   const txt=items.join('     ▶     ');
   const trk=$('fv-ticker');
@@ -7596,7 +7608,7 @@ submitRefereeResults=function(){
   if(!entries.length){ toast('Enter at least one result before submitting','error'); return; }
   const bad=entries.filter(e=>e.invalid).length;
   const missing=athletes.length-entries.length;
-  const top=entries.filter(e=>e.rank<999).sort((a,b)=>a.rank-b.rank).slice(0,3).map((e,i)=>`${['🥇','🥈','🥉'][i]} ${e.name} — ${e.result}`).join('\n');
+  const top=entries.filter(e=>e.rank<999).sort((a,b)=>a.rank-b.rank).slice(0,3).map((e,i)=>`${['🥇','🥈','🥉'][i]} ${e.name} — ${resTxt(e.result)}`).join('\n');
   const finalOn=$('rp-final')?.checked!==false;
   if(!confirm(`Submit results for ${ev.name}?\n\n${top||'(no ranked results)'}${missing?`\n\n⚠ ${missing} athlete(s) have no result yet.`:''}${bad?`\n⚠ ${bad} time(s) could not be read.`:''}\n\n${finalOn?'Event will be marked FINISHED.':'Saved as provisional (event stays open).'}`)) return;
   if(finalOn){ ev.status='completed'; ev.finalAt=Date.now(); if(s.liveEventId===ev.id) s.liveEventId=null; promoteNext(s); }
@@ -7883,7 +7895,7 @@ function bulkTab(t){
         <div class="form-group"><div class="form-label">Categories (one per line)</div><textarea class="announce-area" id="gen-cats" style="min-height:150px">U-14 Boys\nU-14 Girls\nU-17 Boys\nU-17 Girls</textarea></div>
         <div class="form-group"><div class="form-label">Events</div>
           <div id="gen-discs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px;font-size:13px;color:#c9d1d9">
-            ${['100m','200m','400m','800m','1500m','3000m','4x100m Relay','4x400m Relay','100m Hurdles','Long Jump','High Jump','Triple Jump','Shot Put','Discus Throw','Javelin Throw'].map((d,i)=>`<label><input type="checkbox" value="${d}" ${i<3||d==='Long Jump'||d==='Shot Put'?'checked':''}> ${d}</label>`).join('')}
+            ${['30m','50m','60m','100m','200m','400m','800m','1500m','3000m','4x100m Relay','4x400m Relay','100m Hurdles','Long Jump','Standing Broad Jump','High Jump','Vertical Jump','Triple Jump','Shot Put','Discus Throw','Javelin Throw','Kids Javelin Throw','Softball Throw','Medicine Ball Throw'].map(d=>`<label><input type="checkbox" value="${d}" ${['100m','200m','400m','Long Jump','Shot Put'].includes(d)?'checked':''}> ${d}</label>`).join('')}
           </div>
           <input class="form-input" id="gen-custom" placeholder="Extra events, comma separated (e.g. 60m, Kabaddi Run)" style="margin-top:8px"></div>
       </div>
@@ -8287,7 +8299,7 @@ function renderLiveFeed(){
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;color:#e6edf3;font-size:14px">${esc(n)} <span class="td-badge" style="margin-left:6px;${m.provisional?'background:rgba(251,191,36,0.15);color:var(--gold)':'background:rgba(0,230,118,0.12);color:var(--green)'}">${m.provisional?'PROVISIONAL':'OFFICIAL'}</span>
         <span style="font-size:11px;color:#8b949e;font-weight:400"> · ${m.src==='referee'?'from referee':'by control room'} · ${s.results[n].length} athletes</span></div>
-        <div style="font-size:12px;color:#c9d1d9;margin-top:2px">${top.map((r,i)=>`${['🥇','🥈','🥉'][i]} ${esc(r.name)} <span style="color:var(--teal);font-family:'Share Tech Mono',monospace">${esc(r.result)}</span>`).join(' &nbsp; ')||'<span style="color:#8b949e">entering…</span>'}</div>
+        <div style="font-size:12px;color:#c9d1d9;margin-top:2px">${top.map((r,i)=>`${['🥇','🥈','🥉'][i]} ${esc(r.name)} <span style="color:var(--teal);font-family:'Share Tech Mono',monospace">${esc(resTxt(r.result))}</span>`).join(' &nbsp; ')||'<span style="color:#8b949e">entering…</span>'}</div>
       </div>
       ${m.provisional?`<button class="btn xs primary" onclick="approveResults(${ev.id})">✓ Make Official</button>`:''}
       <button class="btn xs" onclick="openResultsFor(${ev.id})">Open</button>
@@ -8727,7 +8739,7 @@ function qualifyToFinal(){
   });
   saveStore(s);
   $('q-out').innerHTML=`<div style="color:var(--green);margin-bottom:6px">✓ ${all.length} qualified to <b>${esc(fin.name)}</b> (${added} new entries, lanes ${field?'in order':'seeded centre-first'})</div>`+
-    all.map((x,i)=>`<div style="font-size:12px">${i+1}. ${esc(x.r.name)} <span style="color:#8b949e">${esc(x.r.team)} · ${esc(x.heat.replace(base,'').replace(/^\s*[—-]\s*/,''))}</span> <b style="color:var(--teal)">${esc(x.r.result)}</b> <span class="td-badge" style="background:${x.how==='Q'?'rgba(0,230,118,0.15);color:var(--green)':'rgba(0,176,255,0.15);color:var(--blue)'}">${x.how}</span></div>`).join('');
+    all.map((x,i)=>`<div style="font-size:12px">${i+1}. ${esc(x.r.name)} <span style="color:#8b949e">${esc(x.r.team)} · ${esc(x.heat.replace(base,'').replace(/^\s*[—-]\s*/,''))}</span> <b style="color:var(--teal)">${esc(resTxt(x.r.result))}</b> <span class="td-badge" style="background:${x.how==='Q'?'rgba(0,230,118,0.15);color:var(--green)':'rgba(0,176,255,0.15);color:var(--blue)'}">${x.how}</span></div>`).join('');
   populateSelects(); toast(`${all.length} athletes qualified to ${fin.name}`,'success');
 }
 
@@ -8798,7 +8810,7 @@ function pubResultsHtml(s,ev,limit){
   if(!rows.length) return '<div class="pb-empty">Results not in yet</div>';
   return (m&&m.provisional?'<div class="pb-prov">● LIVE ENTRY — provisional</div>':'')+rows.map(r=>`<div class="pb-row${r.rank===1?' g':r.rank===2?' s':r.rank===3?' b':''}">
     <div class="pb-rk">${rankLabel(r)}</div><div class="pb-nm">${esc(r.name)}<small>${esc(r.team)}${r.bib?' · #'+esc(r.bib):''}</small></div>
-    <div class="pb-res">${esc(r.result||'—')}${r.pb?'<i>PB</i>':r.sb?'<i>SB</i>':r.dnf?'<i class="x">DNF</i>':r.dq?'<i class="x">DQ</i>':r.dns?'<i class="x">DNS</i>':''}</div></div>`).join('');
+    <div class="pb-res">${esc(resTxt(r.result)||'—')}${r.pb?'<i>PB</i>':r.sb?'<i>SB</i>':r.dnf?'<i class="x">DNF</i>':r.dq?'<i class="x">DQ</i>':r.dns?'<i class="x">DNS</i>':''}</div></div>`).join('');
 }
 function renderPublic(){
   const box=$('pub-body'); if(!box) return;
@@ -9655,10 +9667,10 @@ resRowHtml=function(r){
   const g=r.rank===1?'g1':r.rank===2?'g2':r.rank===3?'g3':'';
   const flag=r.mr===true?['MR','#ffd400','#000']:r.dq?['DQ','#ff2a00','#fff']:r.dns?['DNS','#ff2a00','#fff']:r.dnf?['DNF','#ff2a00','#fff']:r.pb?['PB','#00e050','#000']:r.sb?['SB','#00d8ff','#000']:null;
   const wind=r.wind!=null&&r.wind!==''?`<span style="font-size:.45em;color:${r.wa?'#ff9a3c':'#c8d3db'};margin-left:.4em">${fmtWind(Number(r.wind))}${r.wa?'w':''}</span>`:'';
-  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(r.result||'—')}${wind}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
+  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(resTxt(r.result)||'—')}${wind}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
 };
 const _opsPubRes=pubResultsHtml;
-pubResultsHtml=function(s,ev,limit){ let h=_opsPubRes(s,ev,limit); (s.results[ev.name]||[]).forEach(r=>{ if(r.mr===true) h=h.replace(`${esc(r.result||'—')}<`,`${esc(r.result||'—')}<i style="background:#ffd400;color:#000">MEET RECORD</i><`); }); return h; };
+pubResultsHtml=function(s,ev,limit){ let h=_opsPubRes(s,ev,limit); (s.results[ev.name]||[]).forEach(r=>{ if(r.mr===true) h=h.replace(`${esc(resTxt(r.result)||'—')}<`,`${esc(resTxt(r.result)||'—')}<i style="background:#ffd400;color:#000">MEET RECORD</i><`); }); return h; };
 // Records page
 function recordRows(s){ const keys=new Map(); s.events.forEach(e=>{ const k=recordKeyOf(e); if(k&&!keys.has(k)) keys.set(k,recordLabel(e.recordKey?(s.records[k]?.event||e.name):e.name)); }); Object.entries(s.records||{}).forEach(([k,r])=>{ if(!keys.has(k)) keys.set(k,r.event||k); }); return [...keys.entries()].sort((a,b)=>a[1].localeCompare(b[1])); }
 function renderRecords(){
@@ -9796,7 +9808,7 @@ function sheetHtml(ev){
     <table class="info"><tr><td><b>Category:</b> ${esc(ev.category||'—')}</td><td><b>Round:</b> ${esc(ev.heat||'—')}</td><td><b>Venue:</b> ${esc(ev.venue||'—')}</td><td><b>Scheduled:</b> ${esc(ev.time||'—')}</td></tr>
       <tr><td><b>Status:</b> ${meta&&meta.provisional?'PROVISIONAL':rows.length?'OFFICIAL':'NO RESULTS'}</td><td><b>Wind:</b> ${wind!=null?fmtWind(wind)+' m/s':field&&needsWind(ev)?'per jump':'—'}</td><td><b>Entries:</b> ${ath.length} (${Object.values(cr).filter(v=>v==='in').length} checked in)</td><td><b>Meet record:</b> ${rec?esc(rec.mark)+' '+esc(rec.holder||''):'—'}</td></tr></table>
     <table class="res"><thead><tr><th>Pos</th><th>Lane</th><th>Bib</th><th>Athlete</th><th>Team / School</th>${field?(vert?heights.map(h=>`<th>${h}</th>`).join(''):'<th>T1</th><th>T2</th><th>T3</th>'):''}<th>Result</th><th>Remarks</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td class="c"><b>${rankLabel(r)}</b></td><td class="c">${esc(r.lane||'')}</td><td class="c">${esc(r.bib||'')}</td><td>${esc(r.name)}</td><td>${esc(r.team)}</td>${field?trialCells(r):''}<td class="c"><b>${esc(r.result||'')}</b>${r.wind!=null&&field?`<br><small>${fmtWind(Number(r.wind))}</small>`:''}</td><td>${esc(remark(r))}</td></tr>`).join('')||'<tr><td colspan="9" class="c">No results entered</td></tr>'}
+    ${rows.map(r=>`<tr><td class="c"><b>${rankLabel(r)}</b></td><td class="c">${esc(r.lane||'')}</td><td class="c">${esc(r.bib||'')}</td><td>${esc(r.name)}</td><td>${esc(r.team)}</td>${field?trialCells(r):''}<td class="c"><b>${esc(resTxt(r.result))}</b>${r.wind!=null&&field?`<br><small>${fmtWind(Number(r.wind))}</small>`:''}</td><td>${esc(remark(r))}</td></tr>`).join('')||'<tr><td colspan="9" class="c">No results entered</td></tr>'}
     </tbody></table>
     <div class="sig"><div>Track / Field Referee<br><span>Name &amp; signature</span></div><div>Chief Judge / Technical Official<br><span>Name &amp; signature</span></div><div>Results published at<br><span>${meta&&meta.at?new Date(meta.at).toLocaleString():'________________'}</span></div></div>
     <div class="ft">Printed ${new Date().toLocaleString()} · ${esc(m.name)}</div></div>`;
@@ -9811,7 +9823,7 @@ function certHtml(r,ev,place){
     <div class="title">${P?'Certificate of Merit':'Certificate of Participation'}</div>
     <div class="txt">This is to certify that</div><div class="nm">${esc(r.name)}</div><div class="txt">of <b>${esc(r.team)}</b>${r.bib?` (Bib ${esc(r.bib)})`:''}</div>
     <div class="txt">${P?`secured <b style="color:${P[2]}">${P[0]} PLACE — ${P[1]} MEDAL</b> in`:'participated in'}</div>
-    <div class="evn">${esc(ev.name)}</div>${P&&r.result?`<div class="txt">with a performance of <b>${esc(r.result)}</b>${r.mr===true?' — <b>NEW MEET RECORD</b>':''}</div>`:''}
+    <div class="evn">${esc(ev.name)}</div>${P&&r.result?`<div class="txt">with a performance of <b>${esc(resTxt(r.result))}</b>${r.mr===true?' — <b>NEW MEET RECORD</b>':''}</div>`:''}
     <div class="txt">held at ${esc(m.venue)}${m.dates?' on '+esc(m.dates):''}.</div>
     <div class="sg"><div>${esc(m.sign1)}</div><div>${esc(m.sign2)}</div></div></div></div></div>`;
 }
@@ -9895,7 +9907,7 @@ function renderRunOfShow(){
   <div class="card"><div class="card-hdr"><div class="card-title">🔔 NEEDS ATTENTION</div><span style="font-size:12px;color:#8b949e">${al.length} item(s)</span></div><div>
     ${al.map(([t,h,fix,lbl])=>`<div class="ros-alert ${t}"><span>${h}</span>${fix?`<button class="btn xs" onclick="${fix}">${lbl}</button>`:''}</div>`).join('')||'<div style="padding:14px 16px;color:var(--green)">✓ Nothing needs attention</div>'}</div></div>
   <div class="card"><div class="card-hdr"><div class="card-title">🧾 LATEST OFFICIAL RESULTS</div><div class="flex gap8"><button class="btn xs" onclick="printAllResultSheets()">🖨 All sheets</button><button class="btn xs" onclick="printCertificates(null,'medal')">🎖 All medal certificates</button></div></div><div>
-    ${sortedEvents(s).filter(e=>{ const m=resMeta(s,e.name); return (s.results[e.name]||[]).length&&!(m&&m.provisional); }).sort((a,b)=>(resMeta(s,b.name)?.at||0)-(resMeta(s,a.name)?.at||0)).slice(0,4).map(e=>{ const w=(s.results[e.name]||[]).find(r=>r.rank===1)||{}; return `<div class="ros-next"><div style="flex:1;min-width:0"><b style="color:#e6edf3">${esc(e.name)}</b><div style="font-size:12px;color:#8b949e">🥇 ${esc(w.name||'—')} ${esc(w.result||'')}${w.mr===true?' · 🏆 MR':''}</div></div>
+    ${sortedEvents(s).filter(e=>{ const m=resMeta(s,e.name); return (s.results[e.name]||[]).length&&!(m&&m.provisional); }).sort((a,b)=>(resMeta(s,b.name)?.at||0)-(resMeta(s,a.name)?.at||0)).slice(0,4).map(e=>{ const w=(s.results[e.name]||[]).find(r=>r.rank===1)||{}; return `<div class="ros-next"><div style="flex:1;min-width:0"><b style="color:#e6edf3">${esc(e.name)}</b><div style="font-size:12px;color:#8b949e">🥇 ${esc(w.name||'—')} ${esc(resTxt(w.result))}${w.mr===true?' · 🏆 MR':''}</div></div>
       <div class="flex gap8"><button class="btn xs" onclick="printResultSheet(${e.id})">🖨 Sheet</button><button class="btn xs" onclick="printCertificates(${e.id})">🎖 Certificates</button><button class="btn xs" onclick="generatePodium(${e.id},true)">🏅 Podium</button></div></div>`; }).join('')||'<div style="padding:14px 16px;color:#8b949e">No official results yet</div>'}</div></div>
   <div id="ros-check"></div>`;
   renderChecklist($('ros-check')); setSyncStatus(_syncStatus);
@@ -10268,7 +10280,7 @@ printResultSheet=function(evId){ pcGo(false,{kind:'sheets',scope:'event',ev:evId
 
 function winnersHtml(evs){
   const s=getStore(), m=meetInfo();
-  const cell=(rs)=>rs.length?rs.map(r=>`<b>${esc(r.name)}</b><br><small>${esc(r.team)} · ${esc(r.result||'')}${r.mr===true?' · MR':''}</small>`).join('<hr>'):'—';
+  const cell=(rs)=>rs.length?rs.map(r=>`<b>${esc(r.name)}</b><br><small>${esc(r.team)} · ${esc(resTxt(r.result))}${r.mr===true?' · MR':''}</small>`).join('<hr>'):'—';
   const rows=evs.map(ev=>{ const rs=(s.results[ev.name]||[]).filter(r=>!r.dnf&&!r.dq&&!r.dns); const by=n=>rs.filter(r=>r.rank===n);
     const pv=(resMeta(s,ev.name)||{}).provisional; return `<tr><td><b>${esc(ev.name)}</b>${pv?'<br><small style="color:#c00">provisional</small>':''}</td><td>${cell(by(1))}</td><td>${cell(by(2))}</td><td>${cell(by(3))}</td></tr>`; }).join('');
   return `<div class="page"><div class="hd">${m.logo?`<img src="${m.logo}">`:''}<div><div class="t1">${esc(m.name)}</div><div class="t2">${esc(m.org)} · ${esc(m.venue)}${m.dates?' · '+esc(m.dates):''}</div></div></div>
@@ -10746,7 +10758,7 @@ const SH_KINDS=[
 function shHead(title){ const m=meetInfo(); return `*${m.name}*\n${title}\n`; }
 function shFoot(){ let t=''; if(publicUrlAvailable()) t+=`\n📱 Live results: ${publicUrl()}`; return t+`\n_${meetInfo().org}_`; }
 function shDay(ev){ return maxDay()>1?` · Day ${parseInt(ev.day)||1}`:''; }
-function shMark(r){ return r.result?`*${r.result}*`:''; }
+function shMark(r){ return r.result?`*${resTxt(r.result)}*`:''; }
 function shFlags(r){ return [r.mr===true?'🏆 MEET RECORD':r.mr==='='?'= MR':'',r.pb?'PB':'',r.sb?'SB':'',r.wa?'wind-assisted':''].filter(Boolean).join(' · '); }
 function shRank(r){ if(r.dns) return 'DNS'; if(r.dq) return 'DQ'; if(r.dnf) return 'DNF'; if(!(r.rank>=1&&r.rank<999)) return '—'; return r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':r.rank+'.'; }
 function shResultBlock(s,ev,top){
@@ -11710,6 +11722,59 @@ checklist=(function(orig){ return function(){
   if(c.mode==='firebase'){ const n=Object.keys(outbox()).length; list.push({ok:!n,t:n?`${n} update(s) still waiting to be sent — check the internet`:'All updates delivered (nothing waiting to send)',fix:'flushOutbox()'}); }
   const pct=storageUsedPct(); list.push({ok:pct<70,t:`Browser storage ${pct}% used${pct>=70?' — remove some waiting-screen images':''}`,fix:`showPage('page-waiting',document.querySelector('.nav-item[onclick*=page-waiting]'))`});
   return list; }; })(checklist);
+
+// ═══════════════════════════════════════════════════
+// ATHLETE PHOTOS FROM GOOGLE DRIVE / WEB LINKS — "Photo link" column in Bulk Add Athletes (Excel / CSV / grid)
+// Drive files must be shared "Anyone with the link → Viewer".
+// The photo is downloaded and saved small on this laptop (works offline); if Google blocks that,
+// the link itself is kept and the photo shows whenever the device is online.
+// ═══════════════════════════════════════════════════
+ATH_FIELDS.push({k:'photo',label:'Photo link',w:160,al:['photo','photolink','photourl','photodrivelink','drivelink','drivephoto','image','imagelink','imageurl','picture','pic','photograph']});
+function driveId(u){ const s=String(u||'').trim();
+  const m=s.match(/drive\.google\.com\/file\/d\/([\w-]{10,})/)||s.match(/drive\.google\.com\/(?:open|uc|thumbnail)\?(?:[^#]*&)?id=([\w-]{10,})/)||s.match(/docs\.google\.com\/uc\?(?:[^#]*&)?id=([\w-]{10,})/)||s.match(/googleusercontent\.com\/d\/([\w-]{10,})/);
+  return m?m[1]:null; }
+function photoSources(u){ const s=String(u||'').trim(), id=driveId(s);
+  if(id) return [`https://lh3.googleusercontent.com/d/${id}=w600`,`https://drive.google.com/thumbnail?id=${id}&sz=w600`];
+  if(/drive\.google\.com\/drive\/folders\//.test(s)) return [];      // a folder link is not a photo
+  return /^https?:\/\/\S+$/i.test(s)?[s]:[]; }
+function loadImg(src,cors){ return new Promise((res,rej)=>{ const im=new Image(); if(cors) im.crossOrigin='anonymous'; im.referrerPolicy='no-referrer';
+  const t=setTimeout(()=>{ im.src=''; rej(new Error('timeout')); },20000);
+  im.onload=()=>{ clearTimeout(t); (im.naturalWidth>1?res:rej)(im); }; im.onerror=()=>{ clearTimeout(t); rej(new Error('load')); }; im.src=src; }); }
+async function fetchPhoto(u){
+  const srcs=photoSources(u); if(!srcs.length) throw new Error(/folders\//.test(u)?'folder link — use each photo’s own link':'not a photo link');
+  for(const src of srcs){ try{ return cropToPhoto(await loadImg(src,true)); }catch(e){} }      // saved copy (offline-safe)
+  for(const src of srcs){ try{ await loadImg(src,false); return src; }catch(e){} }            // link only
+  throw new Error('not shared publicly (Anyone with the link)'); }
+let _photoJob=null;
+function photoJobBox(html){ let b=$('photo-job'); if(!b){ b=document.createElement('div'); b.id='photo-job';
+    b.style.cssText='position:fixed;left:16px;bottom:16px;z-index:9999;max-width:min(420px,calc(100vw - 32px));background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:10px;padding:12px 14px;font:13px/1.45 Barlow,Arial,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+    document.body.appendChild(b); }
+  b.innerHTML=html; return b; }
+async function runPhotoJob(list){
+  if(!list.length) return; if(_photoJob) _photoJob.cancel=true;
+  const job=_photoJob={cancel:false}; let done=0, saved=0, linked=0; const failed=[];
+  const draw=()=>photoJobBox(`📷 <b>Athlete photos</b> — ${done}/${list.length}<div style="height:6px;background:#30363d;border-radius:3px;margin:6px 0"><div style="height:6px;width:${Math.round(done/list.length*100)}%;background:var(--green);border-radius:3px"></div></div><span style="color:#8b949e">You can keep working.</span> <button class="btn xs" onclick="_photoJob&&(_photoJob.cancel=true)">Stop</button>`);
+  draw(); let i=0;
+  const worker=async()=>{ while(i<list.length&&!job.cancel){ const it=list[i++];
+      try{ const d=await fetchPhoto(it.url); if(job.cancel) break; PhotoDB.put(it.key,d); d.startsWith('data:')?saved++:linked++; }
+      catch(e){ failed.push(`${it.name}: ${e.message}`); }
+      done++; draw(); } };
+  await Promise.all([worker(),worker(),worker()]);
+  afterPhotoChange(); if(_photoJob===job) _photoJob=null;
+  photoJobBox(`📷 <b>Athlete photos ${job.cancel?'stopped':'done'}</b><br>✅ ${saved} saved on this laptop${linked?`<br>🔗 ${linked} saved as link (show when online)`:''}${failed.length?`<br><span style="color:var(--red)">❌ ${failed.length} not loaded</span><div style="max-height:140px;overflow:auto;font-size:12px;color:#8b949e;margin-top:4px">${failed.map(esc).join('<br>')}</div><div style="font-size:12px;margin-top:4px">Fix: Drive → Share → <b>Anyone with the link</b>, then import again.</div>`:''}<div style="text-align:right;margin-top:8px"><button class="btn xs" onclick="this.closest('#photo-job').remove()">Close</button></div>`);
+}
+bulkImport=(function(orig){ return function(){
+  const want=_bulk.kind==='athletes'?(_bulk.preview||[]).filter(r=>['ok','warn','upd'].includes(r.status)&&r.data&&String(r.data.photo||'').trim()).map(r=>r.data):[];
+  const r=orig.apply(this,arguments);
+  if(want.length){ const s=getStore(), seen=new Set(), list=[];
+    want.forEach(d=>{ const a=[...s.athletes].reverse().find(x=>x.name===String(d.name).trim()&&x.event===d.event&&x.team.toLowerCase()===String(d.team).trim().toLowerCase()); if(!a) return;
+      const key=photoKey(a); if(seen.has(key)) return; seen.add(key); list.push({key,name:a.name,url:String(d.photo).trim()}); });
+    setTimeout(()=>runPhotoJob(list),300); }
+  return r; }; })(bulkImport);
+downloadBulkTemplate=(function(orig){ return function(kind){ if(kind!=='athletes') return orig.apply(this,arguments);
+  downloadFile('athletes-template.csv','﻿Name,Team,Event,Bib,Lane,DOB,Gender,Village/School,PB,Aadhaar last 4,Photo link\nRavi Thakor,Sanand,U-17 Boys 200m Final,,,12/04/2010,M,Sanand,24.10,1234,https://drive.google.com/file/d/FILE_ID/view?usp=sharing\nMeera Desai,Ahmedabad,U-17 Girls 200m Final,210,4,03/09/2010,F,Bopal,,5678,\n','text/csv'); }; })(downloadBulkTemplate);
+// backups: keep photo links too (not only saved images)
+migrate=(function(orig){ return function(s){ if(s&&s.__photos){ Object.entries(s.__photos).forEach(([k,v])=>{ if(typeof v==='string'&&/^https:\/\//.test(v)){ PhotoDB.put(k,v); delete s.__photos[k]; } }); } return orig.apply(this,arguments); }; })(migrate);
 
 handleUrlParams();
 </script>
