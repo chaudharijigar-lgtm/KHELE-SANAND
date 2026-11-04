@@ -9790,7 +9790,7 @@ openRefEvent=function(r){
 };
 
 // ───────────── MEET DETAILS, RESULT SHEETS, CERTIFICATES ─────────────
-function meetInfo(){ const st=getStore().settings; return {name:(st.meetName&&!/khele sanand athletics meet/i.test(st.meetName))?st.meetName:'Khele Sanand 2026',org:st.organiser||'Vijayi Bharat Foundation',venue:st.meetVenue||'Sanand, Gujarat',dates:st.meetDates||'',sign1:st.sign1||'Chief Referee',sign2:st.sign2||'Organising Secretary',logo:st.logo||''}; }
+function meetInfo(){ const st=getStore().settings; return {name:(st.meetName&&!/^\s*khele sanand athletics meet\s*$/i.test(st.meetName))?st.meetName:'Khele Sanand 2026',org:st.organiser||'Vijayi Bharat Foundation',venue:st.meetVenue||'Sanand, Gujarat',dates:st.meetDates||'',sign1:st.sign1||'Chief Referee',sign2:st.sign2||'Organising Secretary',logo:st.logo||''}; }
 function renderMeetCard(){ const m=meetInfo(); const set=(id,v)=>{ const el=$(id); if(el) el.value=v; }; set('mt-name',m.name); set('mt-org',m.org); set('mt-venue',m.venue); set('mt-dates',m.dates); set('mt-s1',m.sign1); set('mt-s2',m.sign2); const lp=$('mt-logo-prev'); if(lp) lp.innerHTML=m.logo?`<img src="${m.logo}" style="height:46px">`:'<span style="color:#8b949e;font-size:12px">No logo</span>'; }
 function saveMeetInfo(){ const s=getStore(), g=id=>$(id).value.trim(); Object.assign(s.settings,{meetName:g('mt-name'),organiser:g('mt-org'),meetVenue:g('mt-venue'),meetDates:g('mt-dates'),sign1:g('mt-s1'),sign2:g('mt-s2')}); saveStore(s); toast('Meet details saved','success'); }
 function uploadLogo(e){ const f=e.target.files[0]; e.target.value=''; if(!f) return; compressImage(f,360,0.85).then(d=>{ const s=getStore(); s.settings.logo=d; saveStore(s); renderMeetCard(); toast('Logo saved','success'); }); }
@@ -11854,6 +11854,207 @@ downloadBulkTemplate=(function(orig){ return function(kind){ if(kind!=='athletes
   downloadFile('athletes-template.csv','﻿Name,Team,Event,Bib,Lane,DOB,Gender,Village/School,PB,Aadhaar last 4,Photo link\nRavi Thakor,Sanand,U-17 Boys 200m Final,,,12/04/2010,M,Sanand,24.10,1234,https://drive.google.com/file/d/FILE_ID/view?usp=sharing\nMeera Desai,Ahmedabad,U-17 Girls 200m Final,210,4,03/09/2010,F,Bopal,,5678,\n','text/csv'); }; })(downloadBulkTemplate);
 // backups: keep photo links too (not only saved images)
 migrate=(function(orig){ return function(s){ if(s&&s.__photos){ Object.entries(s.__photos).forEach(([k,v])=>{ if(typeof v==='string'&&/^https:\/\//.test(v)){ PhotoDB.put(k,v); delete s.__photos[k]; } }); } return orig.apply(this,arguments); }; })(migrate);
+
+// ═══════════════════════════════════════════════════
+// CERTIFICATE DESIGN v2 — A4 landscape, ornamental frame, logo + organisation + programme name,
+// event ribbon, athlete photo + bib + QR, medal seal, up to 3 signatures (image + name + designation).
+// Settings: Generate → "🎓 Certificate design". Wording follows the organiser's sample.
+// ═══════════════════════════════════════════════════
+const KC_THEMES={saffron:{name:'Saffron',main:'#e8590c',dark:'#1e2a5a',soft:'#fff4ec'},blue:{name:'Royal blue',main:'#1d4ed8',dark:'#13235b',soft:'#eef3ff'},
+  green:{name:'Green',main:'#15803d',dark:'#123b25',soft:'#edf8f1'},maroon:{name:'Maroon',main:'#9f1239',dark:'#3b0a1a',soft:'#fdf0f3'}};
+const KC_MEDAL={1:{w:'Gold',c:'#c9a227',c2:'#f3d97a',o:'1st'},2:{w:'Silver',c:'#8a96a3',c2:'#dde3e8',o:'2nd'},3:{w:'Bronze',c:'#a8602f',c2:'#e7b48a',o:'3rd'}};
+function certCfg(){
+  const st=getStore().settings, m=meetInfo(), c=st.cert||{};
+  const sigs=(Array.isArray(c.sigs)&&c.sigs.length?c.sigs:[{name:'',desig:m.sign1,org:'',img:''},{name:'',desig:m.sign2,org:'',img:''}]).slice(0,3);
+  return {brand:c.brand!=null?c.brand:'KHELE SANAND',tagline:c.tagline||'',from:c.from||'',to:c.to||'',teamWord:c.teamWord!=null?c.teamWord:'village team',
+    theme:KC_THEMES[c.theme]?c.theme:'saffron',photo:c.photo!==false,qr:c.qr!==false,wm:c.wm!==false,sigs};
+}
+function kcDate(iso){ const d=iso?new Date(iso+'T00:00:00'):null; if(!d||isNaN(d)) return '';
+  const n=d.getDate(), suf=(n%10===1&&n!==11)?'st':(n%10===2&&n!==12)?'nd':(n%10===3&&n!==13)?'rd':'th';
+  return `${n}${suf} ${d.toLocaleString('en-IN',{month:'long'})} ${d.getFullYear()}`; }
+function kcEvent(n){ return String(n||'').replace(/\bU\s*-?\s*(\d{1,2})\b/g,'Under-$1').replace(/\s+Final$/i,'').trim(); }
+function kcAthlete(c){ const s=getStore(); return (c.bib&&s.athletes.find(a=>String(a.bib)===String(c.bib)))||s.athletes.find(a=>a.name===c.name&&a.team===c.team)||null; }
+function kcWords(g){ g=String(g||'').toLowerCase();
+  if(/^(m|male|boy)/.test(g)) return {hon:'Mr.',rel:'Son',pro:'He'}; if(/^(f|female|girl)/.test(g)) return {hon:'Ms.',rel:'Daughter',pro:'She'};
+  return {hon:'Mr./Ms.',rel:'Son/Daughter',pro:'He/She'}; }
+function kcQr(text){ try{ const d=document.createElement('div'); if(!makeQr(d,text,180)) return ''; return qrDataUrl(d)||''; }catch{ return ''; } }
+const KC_CORNER=`<svg viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8 112V30Q8 8 30 8h82" stroke-width="2.4"/><path d="M16 112V34q0-18 18-18h78" stroke-width="1"/>
+  <path d="M24 64c0-22 12-38 34-40" stroke-width="1.3"/><path d="M64 24c-16 2-24 12-24 24 0 10 8 15 15 12 6-3 5-11-1-12" stroke-width="1.5"/>
+  <path d="M24 64c2-16 12-24 24-24 10 0 15 8 12 15-3 6-11 5-12-1" stroke-width="1.5"/>
+  <path d="M70 24c6-5 13-6 20-3M24 70c-5 6-6 13-3 20" stroke-width="1.2"/>
+  <path d="M30 30l7 3-3-7z" fill="currentColor" stroke-width=".8"/><circle cx="96" cy="16" r="2" fill="currentColor"/><circle cx="16" cy="96" r="2" fill="currentColor"/></g></svg>`;
+const KC_FLOURISH=`<svg viewBox="0 0 200 20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round"><path d="M4 10h70M126 10h70" stroke-width="1.2"/>
+  <path d="M74 10c8-8 18-8 26 0 8 8 18 8 26 0M74 10c8 8 18 8 26 0 8-8 18-8 26 0" stroke-width="1.3"/><circle cx="100" cy="10" r="2.6" fill="currentColor"/></g></svg>`;
+function kcSeal(place){ const M=KC_MEDAL[place]; if(!M) return '';
+  let pts=''; for(let i=0;i<48;i++){ const r=i%2?44:49, a=i*Math.PI/24; pts+=`${(50+r*Math.cos(a)).toFixed(1)},${(50+r*Math.sin(a)).toFixed(1)} `; }
+  return `<div class="kc-seal"><svg viewBox="0 0 100 128" aria-hidden="true"><path d="M30 80 18 126l14-8 10 10 8-46zM70 80l12 46-14-8-10 10-8-46z" fill="${M.c}"/>
+    <polygon points="${pts}" fill="${M.c}"/><circle cx="50" cy="50" r="37" fill="${M.c2}" stroke="#fff" stroke-width="2.5"/><circle cx="50" cy="50" r="31" fill="none" stroke="${M.c}" stroke-width="1.2" stroke-dasharray="2 2"/>
+    <text x="50" y="47" text-anchor="middle" font-family="Georgia,serif" font-size="20" font-weight="700" fill="#3a2a00">${M.o}</text>
+    <text x="50" y="64" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" letter-spacing="2" fill="#3a2a00">${M.w.toUpperCase()}</text></svg></div>`; }
+// the certificate page itself
+function kcCert(c){
+  const m=meetInfo(), K=certCfg(), T=KC_THEMES[K.theme], blank=!!c.blank, M=KC_MEDAL[c.place];
+  const a=blank?null:(c.ath||kcAthlete(c)), W=kcWords(c.gender!=null?c.gender:a&&a.gender);
+  const father=blank?'':(c.father!=null?c.father:(a&&a.father)||''), team=blank?'':(c.team||'');
+  const events=(c.events||[]).map(kcEvent).filter(Boolean), evTxt=events.join(', ');
+  const F=(v,w)=>v?`<span class="fld">${esc(v)}</span>`:`<span class="fld blank" style="min-width:${w}mm">&nbsp;</span>`;
+  const from=kcDate(K.from), to=kcDate(K.to);
+  const when=from&&to&&K.from!==K.to?` organized from ${F(from)} to ${F(to)}`:from?` organized on ${F(from)}`:m.dates?` organized on ${F(m.dates)}`:'';
+  const who=`This certificate is awarded to ${blank?'Mr./Ms.':W.hon} ${F(blank?'':c.name,78)}`
+    +(blank||father?` ${blank?'Son/Daughter':W.rel} of ${F(father,58)}`:'')
+    +(blank||team?` of ${F(team,44)}${K.teamWord?' '+esc(K.teamWord):''}`:'');
+  const body=M
+    ? `${who} in ${F(evTxt,70)}. ${W.pro} won <b class="kc-medalword" style="color:${M.c}">${M.w}</b> medal in <b>${esc(m.name)}</b>${when}.`
+    : `${who} for participating in ${F(blank?'':evTxt,80)} in <b>${esc(m.name)}</b>${when}.`;
+  const perf=M&&c.result?`<div class="kc-perf">Performance: <b>${esc(resTxt(c.result))}</b>${c.mr?' · <b style="color:#c00">NEW MEET RECORD</b>':''}</div>`:'';
+  const photo=K.photo&&!blank&&a&&typeof photoOf==='function'?photoOf(a):null;
+  const showSide=!blank&&(photo||K.qr||c.bib);
+  const qr=!blank&&K.qr?kcQr([K.brand||m.org, M?'Merit':'Participation', c.no?('No '+c.no):'', c.name, evTxt, M?M.w:''].filter(Boolean).join(' | ')):'';
+  const sigs=K.sigs.filter(x=>x&&(x.name||x.desig||x.img));
+  const ribbon=M?M.c:T.main;
+  return `<div class="page kscert" style="--kc:${T.main};--kcd:${T.dark};--kcs:${T.soft};--kcr:${ribbon}"><div class="kc">
+    <div class="kc-frame"></div><div class="kc-frame2"></div>
+    <div class="kc-corner tl">${KC_CORNER}</div><div class="kc-corner tr">${KC_CORNER}</div><div class="kc-corner bl">${KC_CORNER}</div><div class="kc-corner br">${KC_CORNER}</div>
+    ${m.logo&&K.wm?`<img class="kc-wm" src="${m.logo}" alt="">`:''}
+    <div class="kc-no">Certi. No.: <b>${c.no?esc(c.no):'<span class="fld blank" style="min-width:28mm">&nbsp;</span>'}</b></div>
+    ${kcSeal(c.place)}
+    <div class="kc-head">${m.logo?`<img class="kc-logo" src="${m.logo}" alt="">`:''}
+      <div class="kc-org">${esc(m.org)}</div>${K.brand?`<div class="kc-brand">${esc(K.brand)}</div>`:''}${K.tagline?`<div class="kc-tag">${esc(K.tagline)}</div>`:''}</div>
+    <div class="kc-title">Certificate <span>of</span> ${M?'Merit':'Participation'}</div>
+    <div class="kc-flourish">${KC_FLOURISH}</div>
+    <div class="kc-ribbon"><span>${esc(m.name)}</span></div>
+    <div class="kc-main${showSide?'':' noside'}">
+      ${showSide?`<div class="kc-side">${K.photo?(photo?`<img class="kc-photo" src="${photo}" alt="">`:`<div class="kc-photo empty">PHOTO</div>`):''}
+        ${c.bib?`<div class="kc-bib"><small>ATHLETE NO.</small>${esc(c.bib)}</div>`:''}${qr?`<img class="kc-qr" src="${qr}" alt="">`:''}</div>`:''}
+      <div class="kc-body"><p>${body}</p>${perf}</div>
+    </div>
+    <div class="kc-sigs">${sigs.map(x=>`<div class="kc-sig">${x.img?`<img src="${x.img}" alt="">`:'<i></i>'}<b>${esc(x.name||'')}</b><span>${esc(x.desig||'')}</span>${x.org?`<em>${esc(x.org)}</em>`:''}</div>`).join('')}</div>
+    <div class="kc-date">Date: ${blank?'<span class="fld blank" style="min-width:30mm">&nbsp;</span>':new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+  </div></div>`;
+}
+function KC_CSS(){ return `@page{size:A4 landscape;margin:0}
+.page.kscert{padding:0!important;width:297mm;height:209.5mm;max-width:none!important;overflow:hidden;position:relative;background:#fff}
+@media screen{.page.kscert{margin:0 auto 14px!important}}
+.kc{position:absolute;inset:0;font-family:Georgia,'Times New Roman',serif;color:#1d1d1d;background:radial-gradient(ellipse at 50% 45%,#fff 55%,var(--kcs) 100%)}
+.kc-frame{position:absolute;inset:7mm;border:2.2px solid var(--kc)}.kc-frame2{position:absolute;inset:9.5mm;border:.8px solid var(--kcd);opacity:.55}
+.kc-corner{position:absolute;width:30mm;height:30mm;color:var(--kc)}.kc-corner svg{width:100%;height:100%}
+.kc-corner.tl{top:4.5mm;left:4.5mm}.kc-corner.tr{top:4.5mm;right:4.5mm;transform:scaleX(-1)}.kc-corner.bl{bottom:4.5mm;left:4.5mm;transform:scaleY(-1)}.kc-corner.br{bottom:4.5mm;right:4.5mm;transform:scale(-1,-1)}
+.kc-wm{position:absolute;left:50%;top:56%;width:100mm;height:100mm;object-fit:contain;transform:translate(-50%,-50%);opacity:.045;filter:grayscale(1);mix-blend-mode:multiply}
+.kc-no{position:absolute;top:14mm;left:37mm;font:11pt Arial,sans-serif;color:#333}
+.kc-head{position:absolute;top:13mm;left:0;right:0;text-align:center}
+.kc-logo{height:19mm;max-width:60mm;object-fit:contain;display:block;margin:0 auto 1.5mm}
+.kc-org{font:700 12.5pt Arial,sans-serif;letter-spacing:3.5px;text-transform:uppercase;color:var(--kcd)}
+.kc-brand{font:900 21pt Arial,sans-serif;letter-spacing:5px;color:var(--kc);line-height:1.15}
+.kc-tag{font:9pt Arial,sans-serif;color:#555;margin-top:1mm}
+.kc-title{position:absolute;top:58mm;left:0;right:0;text-align:center;font-size:30pt;font-variant:small-caps;letter-spacing:4px;color:var(--kcd);line-height:1}
+.kc-title span{font-size:20pt;font-style:italic;font-variant:normal;letter-spacing:1px;color:var(--kc)}
+.kc-flourish{position:absolute;top:70mm;left:50%;width:70mm;transform:translateX(-50%);color:var(--kc)}.kc-flourish svg{width:100%;display:block}
+.kc-ribbon{position:absolute;top:77mm;left:50%;transform:translateX(-50%);min-width:150mm;max-width:225mm;text-align:center;background:var(--kcr);color:#fff;font:700 12.5pt Arial,sans-serif;letter-spacing:1px;padding:2.2mm 16mm;clip-path:polygon(0 0,100% 0,96% 50%,100% 100%,0 100%,4% 50%)}
+.kc-main{position:absolute;top:92mm;left:22mm;right:22mm;bottom:44mm;display:flex;gap:9mm;align-items:center}
+.kc-main.noside{left:30mm;right:30mm}
+.kc-side{width:36mm;flex:0 0 36mm;display:flex;flex-direction:column;align-items:center;gap:2mm}
+.kc-photo{width:30mm;height:37mm;object-fit:cover;border:1.4mm solid #fff;box-shadow:0 0 0 .5mm var(--kc);background:#f3f3f3}
+.kc-photo.empty{display:flex;align-items:center;justify-content:center;font:9pt Arial,sans-serif;color:#aaa;letter-spacing:2px}
+.kc-bib{font:700 11pt Arial,sans-serif;text-align:center;color:var(--kcd);line-height:1.1}.kc-bib small{display:block;font-size:6.5pt;letter-spacing:1.5px;color:#666}
+.kc-qr{width:19mm;height:19mm;image-rendering:pixelated}
+.kc-body{flex:1;font-size:14.5pt;line-height:2.05;text-align:center}
+.kc-body p{margin:0}.fld{font-family:Arial,sans-serif;font-weight:700;font-size:13pt;color:#111;border-bottom:1.3px dotted #555;padding:0 2.5mm;text-transform:none;white-space:nowrap}
+.fld.blank{display:inline-block}.kc-medalword{font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1px}
+.kc-perf{text-align:center;font:10.5pt Arial,sans-serif;color:#444;margin-top:1mm}
+.kc-seal{position:absolute;top:13mm;right:21mm;width:27mm}.kc-seal svg{width:100%;display:block}
+.kc-sigs{position:absolute;left:24mm;right:24mm;bottom:17mm;display:flex;justify-content:space-around;gap:8mm;text-align:center}
+.kc-sig{flex:1;max-width:72mm;display:flex;flex-direction:column;align-items:center;font-family:Arial,sans-serif}
+.kc-sig img{height:13mm;max-width:52mm;object-fit:contain;mix-blend-mode:multiply}.kc-sig i{height:13mm}
+.kc-sig b{font-size:11.5pt;color:var(--kcd);border-top:1px solid #444;padding-top:1mm;min-width:48mm;min-height:5mm}
+.kc-sig span{font-size:9.5pt;color:#333}.kc-sig em{font-size:9pt;font-style:normal;color:var(--kc)}
+.kc-date{position:absolute;top:19.5mm;left:37mm;font:9.5pt Arial,sans-serif;color:#444}`; }
+pcCert=function(c){ return kcCert(c); };
+pcBuild=(function(orig){ return function(o){
+  if(o&&o.kind==='certpreview'){ const pages=[kcCert({name:'Ravi Thakor',team:'Sanand',bib:'101',events:['U-14 Boys 100m Final'],place:1,result:'12.84',no:'SAMPLE-0001',gender:'Male',father:'Mahesh Thakor'}),
+      kcCert({name:'Meera Desai',team:'Bopal',bib:'214',events:['U-14 Girls Long Jump Final','U-14 Girls 200m Final'],no:'SAMPLE-0002',gender:'Female',father:'Kiran Desai'}),kcCert({blank:true,events:[]})];
+    return {pages,info:{medal:1,part:2,sheets:0,blank:1,skippedProv:0},title:'Certificate preview',css:KC_CSS(),land:true}; }
+  if(o&&o.kind==='custom'){ const d=o.custom||{}, s=getStore(); s.certSeq=(+s.certSeq||0)+1; const no=(meetInfo().name.replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase()||'KS')+String(new Date().getFullYear()).slice(2)+'-'+String(s.certSeq).padStart(4,'0'); saveStore(s);
+    return {pages:[kcCert(Object.assign({},d,{no}))],info:{medal:d.place?1:0,part:d.place?0:1,sheets:0,blank:0,skippedProv:0},title:'Certificate — '+(d.name||''),css:KC_CSS(),land:true}; }
+  const r=orig.apply(this,arguments); if(r&&r.land&&(r.pages||[]).some(x=>String(x).includes('kscert'))) r.css=KC_CSS(); return r; }; })(pcBuild);
+
+// ── settings card: Generate → 🎓 Certificate design ──
+function kcSigRow(i,x){ return `<div class="form-row col4" style="align-items:end;margin-bottom:6px">
+  <div class="form-group"><div class="form-label">Signature ${i+1} — name</div><input class="form-input" id="kc-sn${i}" value="${esc(x.name||'')}" placeholder="e.g. Rajesh Patel"></div>
+  <div class="form-group"><div class="form-label">Designation</div><input class="form-input" id="kc-sd${i}" value="${esc(x.desig||'')}" placeholder="e.g. President"></div>
+  <div class="form-group"><div class="form-label">Organisation (optional)</div><input class="form-input" id="kc-so${i}" value="${esc(x.org||'')}" placeholder="e.g. Vijayi Bharat Foundation"></div>
+  <div class="form-group"><div class="form-label">Signature image</div><div class="flex gap8 aic"><span id="kc-si${i}">${x.img?`<img src="${x.img}" style="height:34px;background:#fff;border-radius:4px">`:'<span style="color:#8b949e;font-size:12px">none</span>'}</span>
+    <label class="btn sm" style="position:relative;overflow:hidden">Upload<input type="file" accept="image/*" onchange="kcSigUpload(event,${i})" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>${x.img?`<button class="btn xs" onclick="kcSigClear(${i})">✕</button>`:''}</div></div></div>`; }
+function renderCertCard(){
+  let card=$('kc-card');
+  if(!card){ const mt=[...document.querySelectorAll('.card-title')].find(e=>/Meet details/.test(e.textContent)); if(!mt) return;
+    mt.closest('.card').insertAdjacentHTML('afterend','<div class="card" id="kc-card" style="grid-column:1/-1"></div>'); card=$('kc-card'); }
+  const K=certCfg(), m=meetInfo();
+  card.innerHTML=`<div class="card-hdr"><div class="card-title">🎓 Certificate design</div><div class="flex gap8"><button class="btn sm" onclick="pcGo(false,{kind:'certpreview'})">👁 Preview</button><button class="btn sm" onclick="openCustomCert()">✍ Custom certificate</button><button class="btn sm primary" onclick="openPrintCentre('allcert')">🖨 Print certificates</button></div></div>
+  <div class="card-body">
+    <div style="font-size:12px;color:#8b949e;margin-bottom:10px">Logo, meet name and organisation come from <b>Meet details</b> above (Organised by = top line). Fill these, press <b>Save</b>, then <b>Preview</b>.</div>
+    <div class="form-row col3">
+      <div class="form-group"><div class="form-label">Programme name (big line)</div><input class="form-input" id="kc-brand" value="${esc(K.brand)}" placeholder="KHELE SANAND"></div>
+      <div class="form-group"><div class="form-label">Tagline / affiliation (optional)</div><input class="form-input" id="kc-tag" value="${esc(K.tagline)}" placeholder="In association with …"></div>
+      <div class="form-group"><div class="form-label">Word after team name</div><input class="form-input" id="kc-tw" value="${esc(K.teamWord)}" placeholder="village team"></div>
+    </div>
+    <div class="form-row col4">
+      <div class="form-group"><div class="form-label">Meet from (date)</div><input class="form-input" type="date" id="kc-from" value="${esc(K.from)}"></div>
+      <div class="form-group"><div class="form-label">Meet to (date)</div><input class="form-input" type="date" id="kc-to" value="${esc(K.to)}"></div>
+      <div class="form-group"><div class="form-label">Colour theme</div><select class="form-select" id="kc-theme">${Object.entries(KC_THEMES).map(([k,t])=>`<option value="${k}"${k===K.theme?' selected':''}>${t.name}</option>`).join('')}</select></div>
+      <div class="form-group"><div class="form-label">Show on certificate</div><div style="display:flex;gap:14px;font-size:13px;padding-top:6px"><label><input type="checkbox" id="kc-photo"${K.photo?' checked':''}> Athlete photo</label><label><input type="checkbox" id="kc-qr"${K.qr?' checked':''}> QR code</label><label><input type="checkbox" id="kc-wm"${K.wm?' checked':''}> Logo watermark</label></div></div>
+    </div>
+    <div id="kc-sigs">${[0,1,2].map(i=>kcSigRow(i,K.sigs[i]||{})).join('')}</div>
+    <div style="font-size:12px;color:#8b949e;margin:4px 0 10px">Signature image: sign on white paper, take a photo, crop tight. Leave a row empty to show only 2 signatures. Father name comes from the <b>Father name</b> column in Bulk Add Athletes (Excel).</div>
+    <button class="btn primary" onclick="saveCertCfg()">Save certificate design</button>
+  </div>`;
+}
+function kcReadSigs(){ const K=certCfg(); return [0,1,2].map(i=>({name:($('kc-sn'+i)||{}).value?.trim()||'',desig:($('kc-sd'+i)||{}).value?.trim()||'',org:($('kc-so'+i)||{}).value?.trim()||'',img:(K.sigs[i]||{}).img||''})); }
+function saveCertCfg(silent){ const s=getStore(), old=s.settings.cert||{}, g=id=>($(id)||{}).value;
+  s.settings.cert=Object.assign({},old,{brand:(g('kc-brand')||'').trim(),tagline:(g('kc-tag')||'').trim(),teamWord:(g('kc-tw')||'').trim(),from:g('kc-from')||'',to:g('kc-to')||'',theme:g('kc-theme')||'saffron',photo:!!($('kc-photo')||{}).checked,qr:!!($('kc-qr')||{}).checked,wm:!!($('kc-wm')||{}).checked,sigs:kcReadSigs()});
+  if(s.settings.cert.from&&s.settings.cert.to&&s.settings.cert.to<s.settings.cert.from){ toast('“Meet to” date is before “Meet from”','error'); return; }
+  saveStore(s); if(!silent) toast('Certificate design saved','success'); }
+function kcSigUpload(e,i){ const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  compressImage(f,520,0.9).then(d=>{ saveCertCfg(true); const s=getStore(); const c=s.settings.cert=s.settings.cert||{}; c.sigs=c.sigs&&c.sigs.length?c.sigs:kcReadSigs(); while(c.sigs.length<3) c.sigs.push({name:'',desig:'',org:'',img:''}); c.sigs[i].img=d; saveStore(s); renderCertCard(); toast('Signature saved','success'); }); }
+function kcSigClear(i){ saveCertCfg(true); const s=getStore(), c=s.settings.cert; if(c&&c.sigs&&c.sigs[i]) c.sigs[i].img=''; saveStore(s); renderCertCard(); }
+renderMeetCard=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ renderCertCard(); }catch(e){ console.warn(e); } return r; }; })(renderMeetCard);
+setTimeout(()=>{ try{ renderCertCard(); }catch{} },900);
+
+// ── custom certificate (any sport / any person, e.g. Kabaddi) ──
+function openCustomCert(){
+  let m=$('kcCustom'); if(!m){ m=document.createElement('div'); m.id='kcCustom'; m.className='modal-overlay'; document.body.appendChild(m); }
+  const s=getStore(); const evOpts=[...new Set(s.events.map(e=>kcEvent(e.name)))].map(n=>`<option value="${esc(n)}">`).join('');
+  m.innerHTML=`<div class="modal" style="width:min(640px,95vw)"><div class="modal-hdr"><div class="modal-title">✍ Custom certificate</div><button class="modal-close" onclick="closeModal('kcCustom')">✕</button></div>
+  <div class="modal-body"><div style="font-size:12px;color:#8b949e;margin-bottom:10px">For any event or sport (e.g. <b>Under-14 Kabaddi (Boys)</b>). Design, logo and signatures come from Certificate design.</div>
+    <div class="form-row col2"><div class="form-group"><div class="form-label">Name *</div><input class="form-input" id="cc-name"></div>
+      <div class="form-group"><div class="form-label">Gender</div><select class="form-select" id="cc-g"><option value="Male">Male (Mr. / Son / He)</option><option value="Female">Female (Ms. / Daughter / She)</option><option value="">Not set (Mr./Ms.)</option></select></div></div>
+    <div class="form-row col2"><div class="form-group"><div class="form-label">Father's name</div><input class="form-input" id="cc-father"></div>
+      <div class="form-group"><div class="form-label">Village / team</div><input class="form-input" id="cc-team" list="dl-cc-team"><datalist id="dl-cc-team">${(s.teams||[]).map(t=>`<option value="${esc(t)}">`).join('')}</datalist></div></div>
+    <div class="form-row col2"><div class="form-group"><div class="form-label">Event *</div><input class="form-input" id="cc-ev" list="dl-cc-ev" placeholder="Under-14 Kabaddi (Boys)"><datalist id="dl-cc-ev">${evOpts}</datalist></div>
+      <div class="form-group"><div class="form-label">Certificate type</div><select class="form-select" id="cc-place"><option value="0">Participation</option><option value="1">Merit — Gold</option><option value="2">Merit — Silver</option><option value="3">Merit — Bronze</option></select></div></div>
+    <div class="form-row col2"><div class="form-group"><div class="form-label">Chest / bib no. (optional)</div><input class="form-input" id="cc-bib"></div>
+      <div class="form-group"><div class="form-label">Performance (optional)</div><input class="form-input" id="cc-res" placeholder="e.g. 12.84 or 4.65m"></div></div>
+    <div class="form-actions"><button class="btn primary" onclick="printCustomCert()">🖨 Make certificate</button></div></div></div>`;
+  m.classList.add('open'); setTimeout(()=>$('cc-name')?.focus(),50);
+}
+function printCustomCert(){ const g=id=>($(id).value||'').trim(), name=g('cc-name'), ev=g('cc-ev');
+  if(!name||!ev){ toast('Name and event are needed','error'); return; }
+  const place=+g('cc-place')||0, bib=g('cc-bib'), s=getStore(), a=bib?s.athletes.find(x=>String(x.bib)===bib):null;
+  closeModal('kcCustom');
+  pcGo(false,{kind:'custom',custom:{name,gender:$('cc-g').value,father:g('cc-father'),team:g('cc-team'),events:[ev],place:place||undefined,bib,result:g('cc-res'),ath:a||{name,bib}}}); }
+
+// ── father name: Bulk Add Athletes column (Excel / CSV / grid) ──
+ATH_FIELDS.push({k:'father',label:'Father name',w:140,al:['father','fathername','fathersname','sonof','daughterof','sdo','swo','parent','parentname','guardian','guardianname']});
+bulkImport=(function(orig){ return function(){
+  const want=_bulk.kind==='athletes'?(_bulk.preview||[]).filter(r=>['ok','warn','upd'].includes(r.status)&&r.data&&String(r.data.father||'').trim()).map(r=>r.data):[];
+  const r=orig.apply(this,arguments);
+  if(want.length){ const s=getStore(); want.forEach(d=>{ s.athletes.filter(x=>x.name===String(d.name).trim()&&x.team.toLowerCase()===String(d.team).trim().toLowerCase()&&(!d.event||x.event===d.event)).forEach(x=>x.father=String(d.father).trim()); }); saveStore(s); }
+  return r; }; })(bulkImport);
+downloadBulkTemplate=(function(orig){ return function(kind){ if(kind!=='athletes') return orig.apply(this,arguments);
+  downloadFile('athletes-template.csv','﻿Name,Father name,Team,Event,Bib,Lane,DOB,Gender,Village/School,PB,Aadhaar last 4,Photo link\nRavi Thakor,Mahesh Thakor,Sanand,U-17 Boys 200m Final,,,12/04/2010,M,Sanand,24.10,1234,https://drive.google.com/file/d/FILE_ID/view?usp=sharing\nMeera Desai,Kiran Desai,Ahmedabad,U-17 Girls 200m Final,210,4,03/09/2010,F,Bopal,,5678,\n','text/csv'); }; })(downloadBulkTemplate);
+
+// father names stay on the control laptop (not sent to screens / phones)
+stateForPush=(function(orig){ return function(s){ const c=orig.apply(this,arguments); (c.athletes||[]).forEach(a=>{ delete a.father; }); return c; }; })(stateForPush);
 
 handleUrlParams();
 </script>
