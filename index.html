@@ -6421,7 +6421,7 @@ function fillSettingsForms(){
 let _raTimer=null;
 function showRecordAlert(name, time){
   const el=$('record-alert');
-  setText('ra-name',name); setText('ra-time',time);
+  setText('ra-name',name); setText('ra-time',typeof resTxt==='function'?resTxt(time):time);
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   clearTimeout(_raTimer); _raTimer=setTimeout(()=>el.classList.remove('show'), 3500);
 }
@@ -8851,7 +8851,7 @@ function renderPublic(){
   }
   box.innerHTML=html;
 }
-setInterval(()=>{ if(isActive('public-screen')){ const t=$('pb-timer'); if(t) t.textContent=fmtElapsed(elapsedMs()); setText('pb-clock',$('d-clock')?.textContent||''); } },250);
+setInterval(()=>{ if(isActive('public-screen')){ setText('pb-timer',fmtElapsed(elapsedMs())); setText('pb-clock',$('d-clock')?.textContent||''); } },250);
 window.addEventListener('storage',e=>{ if((e.key==='khele_sync_tick'||e.key===STORE_KEY)&&isActive('public-screen')){ loadStore(); renderPublic(); } });
 setInterval(()=>{ if(isActive('public-screen')) renderPublic(); },15000);
 function renderPublicCard(){
@@ -12057,6 +12057,142 @@ downloadBulkTemplate=(function(orig){ return function(kind){ if(kind!=='athletes
 
 // father names stay on the control laptop (not sent to screens / phones)
 stateForPush=(function(orig){ return function(s){ const c=orig.apply(this,arguments); (c.athletes||[]).forEach(a=>{ delete a.father; }); return c; }; })(stateForPush);
+
+// ═══════════════════════════════════════════════════
+// MULTI-LIVE — several events live at the same time (e.g. a race + Long Jump + Shot Put).
+// The main live event keeps the timer; "also live" events rotate with it on LED Dashboard and Big View.
+// Control room: Run of Show → "📺 Live on screens": add / remove, pin one event, or auto-rotate.
+// Every screen picks the same event at the same moment (clock-based), so all LEDs stay in step.
+// ═══════════════════════════════════════════════════
+function liveList(s){ s=s||getStore(); const seen=new Set();
+  return [s.liveEventId,...(s.alsoLive||[])].filter(Boolean).map(id=>eventById(s,id)).filter(e=>e&&e.status!=='completed'&&!seen.has(e.id)&&seen.add(e.id)); }
+const KC_FINAL_HOLD=180000; // a just-finished "also live" event stays on screens 3 min with its final results
+function screenList(s){ s=s||getStore(); const L=liveList(s), now=Date.now();
+  const done=(s.alsoLive||[]).map(id=>eventById(s,id)).filter(e=>e&&e.status==='completed'&&e.finalAt&&now-Number(e.finalAt)<KC_FINAL_HOLD&&!L.some(x=>x.id===e.id));
+  return [...L,...done]; }
+function liveRotateSec(s){ s=s||getStore(); return Math.max(4,+s.liveRotate||+getDisplay().rotate||10); }
+function screenEventId(s){ s=s||getStore(); const L=screenList(s); if(!L.length) return s.liveEventId||null;
+  if(s.screenFocus&&L.some(e=>e.id===s.screenFocus)) return s.screenFocus;
+  if(L.length===1) return L[0].id;
+  return L[Math.floor(syncNow()/(liveRotateSec(s)*1000))%L.length].id; }
+// Big View: live events as a SPLIT screen (2–4 columns at once) or a SLIDESHOW (one live slide each)
+function liveViewMode(s){ s=s||getStore(); return s.liveView==='rotate'?'rotate':'split'; }
+function splitLiveSlide(s,L){
+  const list=L.slice(0,4), n=list.length, rowsMax=n>=4?5:8;
+  const cols=list.map(ev=>{ const main=ev.id===s.liveEventId;
+    const res=[...(s.results[ev.name]||[])].sort((a,b)=>a.rank-b.rank).slice(0,rowsMax);
+    const start=res.length?[]:s.athletes.filter(a=>a.event===ev.name).sort((a,b)=>(a.lane||99)-(b.lane||99)).slice(0,rowsMax);
+    const rows=res.length?res.map(resRowHtml).join(''):start.map(a=>`<div class="fv-res lane"><div class="p">${esc(a.lane||'—')}</div><div><div class="n">${esc(a.name)}</div><div class="t">${esc(a.team)}</div></div><div class="r">#${esc(a.bib||'—')}</div><div class="f"></div></div>`).join('');
+    const pm=resMeta(s,ev.name), prov=pm&&pm.provisional&&res.length;
+    const fin=ev.status==='completed';
+    return `<div class="fs-col"><div class="fv-kicker">${fin?'✓ FINAL RESULTS':(main?'● LIVE NOW':'● ALSO LIVE')+(res.length?(prov?' · PROVISIONAL':' · RESULTS'):' · START LIST')}</div>
+      <div class="fv-title">${esc(ev.name)}</div><div class="fv-meta">${esc([ev.venue,ev.category].filter(Boolean).join(' · '))}</div>
+      ${main&&!fin?`<div class="fv-timer"><span id="fv-timer">${fmtElapsed(elapsedMs())}</span></div>`:''}
+      ${rows?`<div class="fv-table" style="grid-template-rows:repeat(${Math.max(rowsMax,(rows.match(/fv-res/g)||[]).length)},1fr)">${rows}</div>`:'<div class="fv-empty" style="font-size:2vw">Athletes on their marks…</div>'}</div>`; });
+  return {key:'live',html:`<div class="fs-grid n${n}">${cols.join('')}</div>`};
+}
+buildFocusSlides=(function(orig){ return function(s){
+  const L=screenList(s); if(!L.length||(L.length===1&&L[0].id===s.liveEventId)) return orig.apply(this,arguments);
+  const base=orig(s), rest=(s.liveOnly&&L.length>1)?[]:base.filter(x=>x.key!=='live');
+  const one=ev=>{ const sl=orig(Object.assign({},s,{liveEventId:ev.id})).find(x=>x.key==='live'); if(!sl) return null;
+    let html=sl.html;
+    if(ev.id!==s.liveEventId) html=html.replace(/<div class="fv-timer">[\s\S]*?<\/span><\/div>/,ev.status==='completed'?'':`<div class="fv-timer"><small>ALSO LIVE</small><span>${esc(String(ev.type||'live').toUpperCase())}</span></div>`);
+    if(ev.status==='completed') html=html.replace(/● LIVE NOW|LATEST RESULTS/,'✓ FINAL RESULTS');
+    return {key:ev.id===s.liveEventId?'live':'live:'+ev.id,html}; };
+  if(L.length===1){ const sl=one(L[0]); return sl?[sl,...rest]:base; }
+  if(s.screenFocus){ const pe=L.find(e=>e.id===s.screenFocus); if(pe){ const sl=one(pe); if(sl) return [sl]; } }
+  if(liveViewMode(s)==='split') return [splitLiveSlide(s,L),...rest];
+  return [...L.map(one).filter(Boolean),...rest]; }; })(buildFocusSlides);
+(function(){ const css=document.createElement('style'); css.textContent=`
+.fs-grid{flex:1;display:grid;gap:1.6vw;height:100%;min-height:0}.fs-grid.n2{grid-template-columns:1fr 1fr}.fs-grid.n3{grid-template-columns:repeat(3,1fr)}.fs-grid.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.fs-col{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:.35vw solid var(--orange);padding-left:1vw}
+.fs-grid .fv-kicker{font-size:clamp(11px,1.15vw,26px)}.fs-grid .fv-meta{font-size:clamp(11px,1.1vw,24px);margin-bottom:.8vh}
+.fs-grid .fv-title{font-size:clamp(18px,min(2.7vw,5vh),64px);-webkit-line-clamp:2}
+.fs-grid .fv-timer{font-size:clamp(24px,min(3.8vw,7vh),96px);text-align:left;margin:.2vh 0 1vh}
+.fs-grid .fv-table{gap:.6vh}.fs-grid .fv-res{grid-template-columns:3.6vw 1fr 8.5vw 3.2vw;gap:.8vw;padding:0 .8vw}
+.fs-grid .fv-res .p{font-size:clamp(16px,2.1vw,50px)}.fs-grid .fv-res .n{font-size:clamp(14px,1.65vw,42px)}.fs-grid .fv-res .t{font-size:clamp(10px,.9vw,20px)}
+.fs-grid .fv-res .r{font-size:clamp(16px,2vw,48px)}.fs-grid .fv-res .f{font-size:clamp(9px,.8vw,18px);padding:.2vh .2vw}
+.fs-grid.n3 .fv-title{font-size:clamp(16px,min(2vw,4.4vh),50px)}.fs-grid.n3 .fv-res{grid-template-columns:2.6vw 1fr 6.4vw 2.4vw;gap:.5vw;padding:0 .5vw}
+.fs-grid.n3 .fv-res .p{font-size:clamp(14px,1.6vw,40px)}.fs-grid.n3 .fv-res .n{font-size:clamp(12px,1.25vw,32px)}.fs-grid.n3 .fv-res .r{font-size:clamp(14px,1.5vw,36px)}.fs-grid.n3 .fv-res .t{font-size:clamp(9px,.75vw,18px)}
+.fs-grid.n4 .fv-title{font-size:clamp(14px,min(2vw,3.4vh),44px);-webkit-line-clamp:1}.fs-grid.n4 .fv-timer{font-size:clamp(20px,min(2.6vw,4.6vh),64px);margin:0}`;
+  document.head.appendChild(css); })();
+// LED Dashboard: hero + live results follow the event on screen
+function ledAltLive(){
+  const s=getStore(), id=screenEventId(s), scr=$('led-screen'); if(!scr) return;
+  const L=screenList(s); const alt=!!(id&&id!==s.liveEventId&&L.some(e=>e.id===id)); scr.classList.toggle('alt-live',alt);
+  setText('d-multi-live',L.length>1?`📺 ${L.findIndex(e=>e.id===id)+1} / ${L.length} LIVE`:'');
+  if(!alt) return; const ev=eventById(s,id); if(!ev) return;
+  setText('d-hero-name',ev.name); setText('d-hero-meta',[ev.venue,ev.category,ev.heat,ev.status==='completed'?'FINAL RESULTS':'ALSO LIVE'].filter(Boolean).join('  ·  ')); setText('d-start-time',ev.time||'--:--');
+  const badge=$('d-status-badge'); if(badge){ const b=statusBadge(ev.status); badge.className='status-badge '+b.cls; badge.textContent=b.txt; }
+  const rows=[...(s.results[ev.name]||[])].sort((a,b)=>a.rank-b.rank), rc=$('d-results');
+  if(rc) rc.innerHTML=rows.length?rows.map(r=>{ const cls=r.rank===1?'r1':r.rank===2?'r2':r.rank===3?'r3':'rn';
+      return `<div class="res-row"><div class="rk ${cls}">${rankLabel(r)}</div><div><div class="at-name">${esc(r.name)}</div><div class="at-sub">${esc(r.team)} · #${esc(r.bib||r.lane||'—')}</div></div>
+        <div><div class="res-time${r.rank===1?' best':''}">${esc(resTxt(r.result)||'—')}</div><div style="text-align:right;margin-top:1px">${flagBadge(r)}</div></div>
+        <div style="text-align:center;font-size:20px">${r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`; }).join('')
+    : `<div style="padding:20px;text-align:center;color:var(--muted);font-family:'Teko',sans-serif;font-size:16px;letter-spacing:2px">Awaiting results...</div>`;
+  setText('d-res-count',rows.length+' Athletes');
+}
+renderDashboard=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ ledAltLive(); }catch(e){ console.warn(e); } return r; }; })(renderDashboard);
+(function(){ const css=document.createElement('style');
+  css.textContent='#led-screen.alt-live div:has(> #d-elapsed){visibility:hidden}#d-multi-live{display:inline-block;margin-left:8px;font-family:Teko,sans-serif;font-size:13px;letter-spacing:2px;color:var(--gold)}';
+  document.head.appendChild(css);
+  const meta=$('d-hero-meta'); if(meta&&!$('d-multi-live')) meta.insertAdjacentHTML('afterend','<span id="d-multi-live"></span>'); })();
+let _scrLast=null;
+let _scrSig='';
+setInterval(()=>{ const s=getStore(), L=screenList(s); const sig=L.map(e=>e.id+e.status).join(',')+'|'+(s.screenFocus||0);
+  const id=L.length?screenEventId(s):null; if(id===_scrLast&&sig===_scrSig) return; const listChanged=sig!==_scrSig; _scrLast=id; _scrSig=sig;
+  if(isActive('led-screen')) renderDashboard(); if(listChanged&&isActive('focus-screen')) renderFocus(null); },1000);
+// keep "also live" events live when the main live event changes
+setLiveEvent=(function(orig){ return function(id){
+  const keep=(getStore().alsoLive||[]).filter(x=>x!==Number(id)); const r=orig.apply(this,arguments); const s=getStore();
+  s.alsoLive=keep.filter(x=>{ const e=eventById(s,x); return e&&e.id!==s.liveEventId&&(e.status!=='completed'||(e.finalAt&&Date.now()-Number(e.finalAt)<KC_FINAL_HOLD)); });
+  s.alsoLive.forEach(x=>{ const e=eventById(s,x); if(e&&e.status!=='completed') e.status='live'; });
+  if(s.screenFocus&&!liveList(s).some(e=>e.id===s.screenFocus)) s.screenFocus=0;
+  saveStore(s); return r; }; })(setLiveEvent);
+// control-room actions
+function addAlsoLive(id){ id=Number(id); const s=getStore(), ev=eventById(s,id); if(!ev){ toast('Choose an event','error'); return; }
+  if(id===s.liveEventId||(s.alsoLive||[]).includes(id)){ toast(`"${ev.name}" is already live`,'info'); return; }
+  if(!s.liveEventId){ setLiveEvent(id); toast(`"${ev.name}" is now LIVE`,'success'); renderRunOfShow(); return; }
+  s.alsoLive=[...(s.alsoLive||[]).filter(x=>{ const e=eventById(s,x); return e&&(e.status!=='completed'||(e.finalAt&&Date.now()-Number(e.finalAt)<KC_FINAL_HOLD)); }),id]; ev.status='live'; saveStore(s); toast(`"${ev.name}" is also LIVE — screens rotate`,'success'); renderRunOfShow(); }
+function removeAlsoLive(id,finish){ id=Number(id); const s=getStore(), ev=eventById(s,id); if(!ev) return;
+  if(finish&&!confirm(`Mark "${ev.name}" as FINISHED?`)) return;
+  if(!finish) s.alsoLive=(s.alsoLive||[]).filter(x=>x!==id); /* a finished event stays listed so screens show its final results for 3 min */
+  if(s.screenFocus===id) s.screenFocus=0;
+  ev.status=finish?'completed':'upcoming'; if(finish) ev.finalAt=Date.now();
+  saveStore(s); toast(finish?`"${ev.name}" finished`:`"${ev.name}" removed from live`,'success'); renderRunOfShow(); }
+function pinScreen(id){ const s=getStore(); s.screenFocus=Number(id)||0; if(s.screenFocus&&!screenList(s).some(e=>e.id===s.screenFocus)){ toast('That event is not live','error'); return; } saveStore(s); _scrLast=null; if(typeof refreshFocusInPlace==='function') renderFocus(true);
+  toast(s.screenFocus?`Screens now show only "${(eventById(s,s.screenFocus)||{}).name}"`:'Screens rotate between live events','success'); renderRunOfShow(); }
+function setLiveView(m){ const s=getStore(); s.liveView=m==='rotate'?'rotate':'split'; saveStore(s); if(isActive('focus-screen')) renderFocus(true); toast(m==='rotate'?'Big View: one live event at a time (slideshow)':'Big View: all live events side by side (split screen)','success'); renderRunOfShow(); }
+function setLiveOnly(on){ const s=getStore(); s.liveOnly=!!on; saveStore(s); if(isActive('focus-screen')) renderFocus(true); toast(on?'Big View shows only live events':'Big View also shows Next events, medals…','success'); }
+function setLiveRotate(v){ const s=getStore(); s.liveRotate=Math.max(4,Math.min(120,parseInt(v)||10)); saveStore(s); toast(`Live events switch every ${s.liveRotate} s`,'success'); }
+function multiLiveCard(){
+  const s=getStore(), L=liveList(s), main=s.liveEventId, pin=s.screenFocus&&L.some(e=>e.id===s.screenFocus)?s.screenFocus:0;
+  const cand=sortedEvents(s).filter(e=>e.status!=='completed'&&e.type!=='ceremony'&&!L.some(x=>x.id===e.id)&&isTodayEv(e));
+  const rows=L.map(ev=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border,#30363d);flex-wrap:wrap">
+      <span style="font-size:11px;padding:2px 7px;border-radius:5px;background:${ev.id===main?'#238636':'#1f6feb'};color:#fff">${ev.id===main?'⏱ MAIN':'ALSO LIVE'}</span>
+      <b style="flex:1;min-width:160px">${esc(ev.name)}</b><span style="font-size:12px;color:#8b949e">${esc(ev.venue||'')}</span>
+      ${L.length>1?`<button class="btn xs${pin===ev.id?' primary':''}" onclick="pinScreen(${pin===ev.id?0:ev.id})">${pin===ev.id?'📌 On screen — tap for Auto':'📌 Only this'}</button>`:''}
+      ${ev.id!==main?`<button class="btn xs" onclick="removeAlsoLive(${ev.id},true)">✓ Finish</button><button class="btn xs" onclick="removeAlsoLive(${ev.id},false)">✕ Not live</button>`:''}</div>`).join('');
+  return `<div class="card" id="ml-card" style="margin-bottom:14px"><div class="card-hdr"><div class="card-title">📺 Live on screens ${L.length?`(${L.length})`:''}</div>
+    <div class="flex gap8 aic" style="font-size:12px">${L.length>1?(pin?`<button class="btn sm primary" onclick="pinScreen(0)">▶ Auto rotate</button>`:`<span style="color:var(--green)">● Auto rotating</span>`):''}
+      ${L.length>1?`<span style="display:inline-flex;border:1px solid var(--border,#30363d);border-radius:8px;overflow:hidden"><button class="btn xs${liveViewMode(s)==='split'?' primary':''}" style="border-radius:0" onclick="setLiveView('split')">⊞ Split screen</button><button class="btn xs${liveViewMode(s)==='rotate'?' primary':''}" style="border-radius:0" onclick="setLiveView('rotate')">🔁 Slideshow</button></span>
+      <label style="display:inline-flex;gap:4px;align-items:center;color:#c9d1d9"><input type="checkbox"${s.liveOnly?' checked':''} onchange="setLiveOnly(this.checked)"> only live events</label>`:''}
+      <span style="color:#8b949e">switch every</span><input class="form-input" type="number" min="4" max="120" value="${liveRotateSec(s)}" style="width:64px;padding:4px 6px" onchange="setLiveRotate(this.value)"><span style="color:#8b949e">s</span></div></div>
+    <div class="card-body">${rows||'<div style="color:#8b949e;font-size:13px">No live event yet.</div>'}
+      <div class="flex gap8 aic" style="margin-top:10px;flex-wrap:wrap"><select class="form-select" id="ml-add" style="flex:1;min-width:220px">${cand.map(e=>`<option value="${e.id}">${esc(e.time||'--:--')} · ${esc(e.name)}</option>`).join('')||'<option value="">No other events today</option>'}</select>
+        <button class="btn sm primary" onclick="addAlsoLive($('ml-add').value)">➕ Also live</button></div>
+      <div style="font-size:12px;color:#8b949e;margin-top:6px">Run a race and field events together. The timer stays with ⏱ MAIN. <b>Big View / LED wall</b>: ⊞ Split screen shows up to 4 live events side by side, 🔁 Slideshow shows them one after another. <b>LED Dashboard</b> switches its main panel between them. 📌 keeps one event on every screen.</div></div></div>`;
+}
+renderRunOfShow=(function(orig){ return function(){ const r=orig.apply(this,arguments); const host=$('ros-body'); if(host&&!host.querySelector('#ml-card')) host.insertAdjacentHTML('afterbegin',multiLiveCard()); return r; }; })(renderRunOfShow);
+
+// Public phone page: every live event gets its own card (also-live events come with status LIVE in the feed)
+renderPublic=(function(orig){ return function(){ const r=orig.apply(this,arguments);
+  try{ if(_pubTab!=='live') return r; const s=getStore(); const extra=s.events.filter(e=>e.status==='live'&&e.id!==s.liveEventId); if(!extra.length) return r;
+    const html=extra.map(ev=>`<div class="pb-card pb-live"><div class="pb-kick">● ALSO LIVE</div><div class="pb-title">${esc(ev.name)}</div><div class="pb-meta">${esc([ev.venue,ev.category,ev.heat].filter(Boolean).join(' · '))}</div></div><div class="pb-card">${pubResultsHtml(s,ev,10)}</div>`).join('');
+    const scr=$('public-screen'), main=scr&&scr.querySelector('.pb-live');
+    if(main&&main.nextElementSibling) main.nextElementSibling.insertAdjacentHTML('afterend',html);
+    else { const first=scr&&scr.querySelector('.pb-card'); if(first) first.outerHTML=html; }
+  }catch(e){ console.warn(e); } return r; }; })(renderPublic);
 
 handleUrlParams();
 </script>
