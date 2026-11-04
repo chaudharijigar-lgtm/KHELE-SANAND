@@ -11866,7 +11866,7 @@ const KC_MEDAL={1:{w:'Gold',c:'#c9a227',c2:'#f3d97a',o:'1st'},2:{w:'Silver',c:'#
 function certCfg(){
   const st=getStore().settings, m=meetInfo(), c=st.cert||{};
   const sigs=(Array.isArray(c.sigs)&&c.sigs.length?c.sigs:[{name:'',desig:m.sign1,org:'',img:''},{name:'',desig:m.sign2,org:'',img:''}]).slice(0,3);
-  return {brand:c.brand!=null?c.brand:'KHELE SANAND',tagline:c.tagline||'',from:c.from||'',to:c.to||'',teamWord:c.teamWord!=null?c.teamWord:'village team',
+  return {brand:c.brand!=null?c.brand:'KHELE SANAND',tagline:c.tagline||'',venue:(c.venue!=null&&String(c.venue).trim()!=='')?String(c.venue).trim():(m.venue||''),from:c.from||'',to:c.to||'',teamWord:c.teamWord!=null?c.teamWord:'village team',
     theme:KC_THEMES[c.theme]?c.theme:'saffron',photo:c.photo!==false,qr:c.qr!==false,wm:c.wm!==false,sigs};
 }
 function kcDate(iso){ const d=iso?new Date(iso+'T00:00:00'):null; if(!d||isNaN(d)) return '';
@@ -11900,7 +11900,8 @@ function kcCert(c){
   const events=(c.events||[]).map(kcEvent).filter(Boolean), evTxt=events.join(', ');
   const F=(v,w)=>v?`<span class="fld">${esc(v)}</span>`:`<span class="fld blank" style="min-width:${w}mm">&nbsp;</span>`;
   const from=kcDate(K.from), to=kcDate(K.to);
-  const when=from&&to&&K.from!==K.to?` organized from ${F(from)} to ${F(to)}`:from?` organized on ${F(from)}`:m.dates?` organized on ${F(m.dates)}`:'';
+  const at=K.venue?` at ${F(K.venue)}`:'';
+  const when=from&&to&&K.from!==K.to?` organized${at} from ${F(from)} to ${F(to)}`:from?` organized${at} on ${F(from)}`:m.dates?` organized${at} on ${F(m.dates)}`:at?` organized${at}`:'';
   const who=`This certificate is awarded to ${blank?'Mr./Ms.':W.hon} ${F(blank?'':c.name,78)}`
     +(blank||father?` ${blank?'Son/Daughter':W.rel} of ${F(father,58)}`:'')
     +(blank||team?` of ${F(team,44)}${K.teamWord?' '+esc(K.teamWord):''}`:'');
@@ -11998,6 +11999,7 @@ function renderCertCard(){
       <div class="form-group"><div class="form-label">Tagline / affiliation (optional)</div><input class="form-input" id="kc-tag" value="${esc(K.tagline)}" placeholder="In association with …"></div>
       <div class="form-group"><div class="form-label">Word after team name</div><input class="form-input" id="kc-tw" value="${esc(K.teamWord)}" placeholder="village team"></div>
     </div>
+    <div class="form-row col1"><div class="form-group"><div class="form-label">Venue — “organized at …” (where the meet was held)</div><input class="form-input" id="kc-venue" value="${esc(K.venue)}" placeholder="e.g. Taluka Sports Complex, Sanand, Gujarat"></div></div>
     <div class="form-row col4">
       <div class="form-group"><div class="form-label">Meet from (date)</div><input class="form-input" type="date" id="kc-from" value="${esc(K.from)}"></div>
       <div class="form-group"><div class="form-label">Meet to (date)</div><input class="form-input" type="date" id="kc-to" value="${esc(K.to)}"></div>
@@ -12011,7 +12013,7 @@ function renderCertCard(){
 }
 function kcReadSigs(){ const K=certCfg(); return [0,1,2].map(i=>({name:($('kc-sn'+i)||{}).value?.trim()||'',desig:($('kc-sd'+i)||{}).value?.trim()||'',org:($('kc-so'+i)||{}).value?.trim()||'',img:(K.sigs[i]||{}).img||''})); }
 function saveCertCfg(silent){ const s=getStore(), old=s.settings.cert||{}, g=id=>($(id)||{}).value;
-  s.settings.cert=Object.assign({},old,{brand:(g('kc-brand')||'').trim(),tagline:(g('kc-tag')||'').trim(),teamWord:(g('kc-tw')||'').trim(),from:g('kc-from')||'',to:g('kc-to')||'',theme:g('kc-theme')||'saffron',photo:!!($('kc-photo')||{}).checked,qr:!!($('kc-qr')||{}).checked,wm:!!($('kc-wm')||{}).checked,sigs:kcReadSigs()});
+  s.settings.cert=Object.assign({},old,{venue:(g('kc-venue')||'').trim(),brand:(g('kc-brand')||'').trim(),tagline:(g('kc-tag')||'').trim(),teamWord:(g('kc-tw')||'').trim(),from:g('kc-from')||'',to:g('kc-to')||'',theme:g('kc-theme')||'saffron',photo:!!($('kc-photo')||{}).checked,qr:!!($('kc-qr')||{}).checked,wm:!!($('kc-wm')||{}).checked,sigs:kcReadSigs()});
   if(s.settings.cert.from&&s.settings.cert.to&&s.settings.cert.to<s.settings.cert.from){ toast('“Meet to” date is before “Meet from”','error'); return; }
   saveStore(s); if(!silent) toast('Certificate design saved','success'); }
 function kcSigUpload(e,i){ const f=e.target.files[0]; e.target.value=''; if(!f) return;
