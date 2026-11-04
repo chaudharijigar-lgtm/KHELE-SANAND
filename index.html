@@ -12194,6 +12194,70 @@ renderPublic=(function(orig){ return function(){ const r=orig.apply(this,argumen
     else { const first=scr&&scr.querySelector('.pb-card'); if(first) first.outerHTML=html; }
   }catch(e){ console.warn(e); } return r; }; })(renderPublic);
 
+// ═══════════════════════════════════════════════════
+// FIX: several referee phones submitting at once (Live Sync)
+// While a phone was sending, the control room's updates for OTHER events arrived and replaced the phone's
+// own results with the (still empty) room copy — the phone then sent empty results. The referee's own event
+// (results, final flag) now stays on the phone until the control room has it.
+// ═══════════════════════════════════════════════════
+applyRemote=(function(orig){ return function(){
+  const c=getSync(); let keep=null;
+  if(c.role==='referee'&&_refEventId!=null){ const s0=getStore(), ev=eventById(s0,_refEventId);
+    if(ev){ const rows=s0.results[ev.name]; keep={id:ev.id,name:ev.name,rows:rows&&rows.length?JSON.parse(JSON.stringify(rows)):null,meta:(s0.resultsMeta||{})[ev.name]||null,status:ev.status,finalAt:ev.finalAt}; } }
+  const r=orig.apply(this,arguments);
+  if(keep){ const s=getStore(); let ch=false; const rm=(s.resultsMeta||{})[keep.name]; const remoteRows=s.results[keep.name]||[];
+    if(keep.rows&&(!remoteRows.length||((rm&&rm.at)||0)<((keep.meta&&keep.meta.at)||0))){ s.results[keep.name]=keep.rows; s.resultsMeta=s.resultsMeta||{}; if(keep.meta) s.resultsMeta[keep.name]=keep.meta; ch=true; }
+    const ev=eventById(s,keep.id); if(ev&&keep.status==='completed'&&ev.status!=='completed'){ ev.status='completed'; ev.finalAt=keep.finalAt; ch=true; }
+    if(ch){ _applyingRemote=true; try{ saveStore(s); }finally{ _applyingRemote=false; } } }
+  return r; }; })(applyRemote);
+// the result a referee submits is captured the moment SUBMIT is pressed (not a moment later)
+publishResults=(function(orig){ return function(s,ev,entries){ const r=orig.apply(this,arguments);
+  try{ if(getSync().role==='referee'&&getSync().mode==='firebase'){ const k=sessionStorage.getItem('ks_refkey_'+ev.id); if(k&&(s.results[ev.name]||[]).length) queue('inbox/'+ev.id+'/'+k,resultNode(s,ev)); } }catch(e){ console.warn(e); }
+  return r; }; })(publishResults);
+pushResult=(function(orig){ return function(ev){
+  // never let a later, emptier copy overwrite a submitted result that is still waiting to be sent
+  const c=getSync(); if(c.mode==='firebase'&&c.role==='referee'){ const k=sessionStorage.getItem('ks_refkey_'+ev.id), s=getStore();
+    if(k){ const o=outbox()['inbox/'+ev.id+'/'+k]; if(o&&(o.entries||[]).length&&!(s.results[ev.name]||[]).length) return; } }
+  return orig.apply(this,arguments); }; })(pushResult);
+
+// ═══════════════════════════════════════════════════
+// SMART TIME ENTRY — "1.50" in an 800m = 1:50, "1.50.20" = 1:50.20, "1 min 50 sec", "10 sec 50"
+// The "?" mark now appears only for times that are really impossible for the distance.
+// ═══════════════════════════════════════════════════
+function unitTime(t){ // words / units → "m:ss.cc" or "ss.cc"
+  const toks=t.match(/\d+(?:\.\d+)?\s*[a-z]*/g)||[]; let h=0,m=0,sec=null,frac='';
+  toks.forEach(tok=>{ const n=tok.match(/^(\d+(?:\.\d+)?)\s*([a-z]*)$/); if(!n) return; const v=n[1], u=n[2];
+    if(/^(h|hr|hrs|hour|hours)$/.test(u)) h=+v; else if(/^(m|min|mins|minute|minutes)$/.test(u)) m=+v;
+    else if(/^(s|sec|secs|second|seconds)$/.test(u)) sec=v;
+    else if(/^(ms|milli|millis|micro|micros|cs|hundredth|hundredths|centi|)$/.test(u)) frac=String(v).replace('.','').padStart(2,'0').slice(0,3); });
+  if(sec==null&&!m&&!h) return null;
+  let sv=sec==null?'0':String(sec); if(frac&&!sv.includes('.')) sv+='.'+frac;
+  const [si,sf]=sv.split('.'); const ss=(h||m)?String(si).padStart(2,'0'):String(+si);
+  return (h?h+':'+String(m).padStart(2,'0')+':':m?m+':':'')+ss+(sf?'.'+sf:''); }
+fmtTimeInput=(function(orig){ return function(v){
+  let t=String(v==null?'':v).trim(); if(!t) return orig(t);
+  const low=t.toLowerCase().replace(/,/g,'.');
+  if(/^(dnf|dns|dq|nm|x)$/.test(low)) return t;
+  if(/[a-z]/.test(low)){ const u=unitTime(low); if(u) return u; }
+  let m=low.match(/^(\d{1,2})(\d{2})(\d{2})(\d{2})$/); if(m&&+m[2]<60&&+m[3]<60) return `${+m[1]}:${m[2]}:${m[3]}.${m[4]}`;   // 1053000 → 1:05:30.00 (hours)
+  m=low.match(/^(\d{1,2})[.:](\d{2})[.:](\d{2})[.:](\d{1,3})$/); if(m&&+m[2]<60&&+m[3]<60) return `${+m[1]}:${m[2]}:${m[3]}.${m[4]}`; // 1.05.30.00
+  m=low.match(/^(\d{1,2})\.(\d{1,2})\.(\d{1,3})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2].padStart(2,'0')}.${m[3]}`;      // 1.50.20
+  m=low.match(/^(\d{1,2})[\s'"\-;]+(\d{1,2})[\s'"\-;.]+(\d{1,3})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2].padStart(2,'0')}.${m[3]}`; // 1 50 20
+  return orig(t.replace(/,/g,'.')); }; })(fmtTimeInput);
+function minuteReading(t){ // the same digits read as minutes : seconds
+  let m=t.match(/^(\d{1,2})\.(\d{2})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2]}`;
+  m=t.match(/^(\d{1,2})(\d{2})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2]}`;
+  m=t.match(/^(\d{1,2})[\s'"\-;]+(\d{1,2})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2].padStart(2,'0')}`;
+  return null; }
+function smartTime(raw,floor){ const t=String(raw==null?'':raw).trim().replace(/,/g,'.'); if(!t) return t;
+  const A=fmtTimeInput(t); if(!floor) return A; const ta=parseTime(A);
+  if(isNaN(ta)||ta>=floor) return A;
+  const B=minuteReading(t); if(B){ const tb=parseTime(B), max=floor*11/2.5; /* slower than 2.5 m/s is not a race time either */ if(!isNaN(tb)&&tb>=floor&&tb<=max) return B; }
+  return A; }
+buildTrackEntries=(function(orig){ return function(athletes,getVal){
+  const evName=athletes[0]&&athletes[0].event, floor=typeof minPlausibleTime==='function'?minPlausibleTime(evName):0;
+  return orig.call(this,athletes,a=>{ const v=getVal(a)||{}; const raw=String(v.result||'').trim(); if(!raw) return v; return Object.assign({},v,{result:smartTime(raw,floor)}); }); }; })(buildTrackEntries);
+
 handleUrlParams();
 </script>
 <!-- PWA: offline + install. Only runs when hosted (http/https), never from a local file. -->
