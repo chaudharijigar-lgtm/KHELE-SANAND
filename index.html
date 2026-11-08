@@ -12223,7 +12223,7 @@ function multiLiveCard(){
     <div class="card-body">${rows||'<div style="color:#8b949e;font-size:13px">No live event yet.</div>'}
       <div class="flex gap8 aic" style="margin-top:10px;flex-wrap:wrap"><select class="form-select" id="ml-add" style="flex:1;min-width:220px">${cand.map(e=>`<option value="${e.id}">${esc(e.time||'--:--')} · ${esc(e.name)}</option>`).join('')||'<option value="">No other events today</option>'}</select>
         <button class="btn sm primary" onclick="addAlsoLive($('ml-add').value)">➕ Also live</button></div>
-      <div style="font-size:12px;color:#8b949e;margin-top:6px">Run a race and field events together. The timer stays with ⏱ MAIN. <b>Big View / LED wall</b>: ⊞ Split screen shows up to 4 live events side by side, 🔁 Slideshow shows them one after another. <b>LED Dashboard</b> switches its main panel between them. 📌 keeps one event on every screen.</div></div></div>`;
+      <div style="font-size:12px;color:#8b949e;margin-top:6px">Run a race and field events together. ⏱ MAIN uses the big timer; every ALSO LIVE event has its own ▶ Start timer. <b>Big View / LED wall</b>: ⊞ Split screen shows up to 4 live events side by side, 🔁 Slideshow shows them one after another. <b>LED Dashboard</b> switches its main panel between them. 📌 keeps one event on every screen.</div></div></div>`;
 }
 renderRunOfShow=(function(orig){ return function(){ const r=orig.apply(this,arguments); const host=$('ros-body'); if(host&&!host.querySelector('#ml-card')) host.insertAdjacentHTML('afterbegin',multiLiveCard()); return r; }; })(renderRunOfShow);
 
@@ -12299,6 +12299,137 @@ function smartTime(raw,floor){ const t=String(raw==null?'':raw).trim().replace(/
 buildTrackEntries=(function(orig){ return function(athletes,getVal){
   const evName=athletes[0]&&athletes[0].event, floor=typeof minPlausibleTime==='function'?minPlausibleTime(evName):0;
   return orig.call(this,athletes,a=>{ const v=getVal(a)||{}; const raw=String(v.result||'').trim(); if(!raw) return v; return Object.assign({},v,{result:smartTime(raw,floor)}); }); }; })(buildTrackEntries);
+
+// ═══════════════════════════════════════════════════
+// SCREEN NAVIGATION FIX — a clear way back from Big View (v17)
+// Big View now remembers where it was opened from (control panel / dashboard / home) and shows a
+// visible "◀ BACK" bar whenever the mouse moves or the screen is tapped; it hides again after a few
+// seconds so the audience sees a clean screen. The control room top bar gets a "📊 Dashboard"
+// button next to "📺 Big View" so ground screens can be switched back without opening Screen Control.
+// ═══════════════════════════════════════════════════
+let _fvFrom='led', _ledFrom='launcher', _fvHideT=null;
+function curScreen(){ if($('launcher')&&$('launcher').style.display!=='none') return 'launcher';
+  for(const n of ['admin','led','focus','waiting','referee','public','wall']) if(isActive(n+'-screen')) return n; return 'launcher'; }
+function screenLabel(n){ return n==='admin'?'CONTROL PANEL':n==='launcher'?'HOME':'DASHBOARD'; }
+showScreen=(function(orig){ return function(name){
+  const from=curScreen();
+  if(name==='focus'&&from!=='focus') _fvFrom=from==='admin'?'admin':(from==='launcher'&&getSync().role!=='display'&&!/[?&]view=/.test(location.search))?'launcher':'led';
+  if(name==='led'&&from!=='led'&&from!=='focus') _ledFrom=from==='admin'?'admin':'launcher';
+  const r=orig.apply(this,arguments);
+  if(name==='focus') fvNavRender(true);
+  if(name==='led') ledNavRender();
+  return r; }; })(showScreen);
+function fvBack(){ const to=_fvFrom; if(document.fullscreenElement&&to==='admin') document.exitFullscreen().catch(()=>{}); showScreen(to==='launcher'?'launcher':to); }
+function ledBack(){ const to=_ledFrom; if(document.fullscreenElement&&to==='admin') document.exitFullscreen().catch(()=>{}); showScreen(to); }
+function fvNavRender(flash){
+  const c=document.querySelector('#focus-screen .fv-ctrl'); if(!c) return;
+  const extra=_fvFrom==='led'?'':`<button onclick="showScreen('led')" title="LED dashboard">📊 DASHBOARD</button>`;
+  c.innerHTML=`<button class="fv-back" onclick="fvBack()" title="Back (Esc)">◀ BACK TO ${screenLabel(_fvFrom)}</button>${extra}
+    <button onclick="focusGo(-1);restartFocusTimer()" title="Previous (←)">◀</button><button id="fv-pause" onclick="focusPause()">${_fvPaused?'▶ PLAY':'⏸ PAUSE'}</button>
+    <button onclick="focusGo(1);restartFocusTimer()" title="Next (→)">▶</button><button onclick="toggleFullscreen()" title="Full screen (F)">⛶</button>`;
+  if(flash) fvShowCtrl(6000); }
+function ledNavRender(){ const b=document.querySelector('#led-screen .topbar button[onclick*="launcher"],#led-screen .topbar button.led-back'); if(!b) return;
+  b.classList.add('led-back'); b.setAttribute('onclick','ledBack()'); b.textContent=_ledFrom==='admin'?'← Control Panel':'← Back'; }
+function fvShowCtrl(ms){ const fs=$('focus-screen'); if(!fs) return; fs.classList.add('fv-show'); clearTimeout(_fvHideT); _fvHideT=setTimeout(()=>fs.classList.remove('fv-show'),ms||3500); }
+(function(){
+  const st=document.createElement('style');
+  st.textContent=`#focus-screen:not(.fv-show) .fv-ctrl{opacity:0} #focus-screen.fv-show .fv-ctrl,#focus-screen .fv-ctrl:hover{opacity:1}
+  #focus-screen .fv-ctrl{top:1vh;bottom:auto;left:1.5vw;right:auto;z-index:20;flex-wrap:wrap;background:rgba(0,0,0,.88);padding:8px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+  #focus-screen .fv-ctrl .fv-back{background:#ea580c;border-color:#fdba74;font-size:16px;padding:8px 16px}
+  #focus-screen:not(.fv-show){cursor:none}
+  body.wall-frame #focus-screen .fv-ctrl{display:none!important}`;
+  document.head.appendChild(st);
+  const fs=$('focus-screen');
+  if(fs){ ['mousemove','pointerdown','touchstart'].forEach(ev=>fs.addEventListener(ev,()=>fvShowCtrl(),{passive:true})); }
+  document.addEventListener('keydown',e=>{
+    if(/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')) return;
+    if(isActive('focus-screen')){
+      if((e.key==='Escape'&&!document.fullscreenElement)||e.key==='Backspace'||e.key==='b'||e.key==='B'){ e.preventDefault(); e.stopImmediatePropagation(); fvBack(); return; }
+      if(e.key==='d'||e.key==='D'){ e.preventDefault(); showScreen('led'); return; }
+      fvShowCtrl();
+    } else if(isActive('led-screen')&&(e.key==='b'||e.key==='B')&&!e.ctrlKey){ showScreen('focus'); }
+  },true);
+  // control room top bar: Dashboard button beside Big View, current one highlighted
+  const big=document.querySelector('.admin-actions button[onclick="saveScreenSettings(\'focus\')"]');
+  if(big&&!$('ab-dash')){ big.id='ab-big'; big.insertAdjacentHTML('afterend','<button class="btn" id="ab-dash" onclick="saveScreenSettings(\'dashboard\')" title="Switch ground screens back to the Dashboard">📊 Dashboard</button>'); }
+})();
+function screensMark(){ const v=(getDisplay()||{}).view||'dashboard', a=$('ab-big'), b=$('ab-dash'); if(!a||!b) return;
+  a.classList.toggle('primary',v==='focus'); b.classList.toggle('primary',v!=='focus'); }
+saveScreenSettings=(function(orig){ return function(){ const r=orig.apply(this,arguments); screensMark(); return r; }; })(saveScreenSettings);
+renderAdmin=(function(orig){ return function(){ const r=orig.apply(this,arguments); screensMark(); return r; }; })(renderAdmin);
+
+// ═══════════════════════════════════════════════════
+// MULTI-LIVE TIMERS (v18) — every live event has its own stopwatch.
+// The main live event keeps the big timer (s.timerState). Each "also live" event gets its own timer in
+// s.evTimers[id] with ▶ Start / ⏸ Pause / ↺ Reset in Run of Show → "📺 Live on screens".
+// LED Dashboard, Big View (split + slideshow), referee phones and the public page show each event's own time.
+// ═══════════════════════════════════════════════════
+const EVT_ZERO={running:false,startMs:null,accumulated:0};
+function evTimerOf(s,id){ s=s||getStore(); id=Number(id); if(id===s.liveEventId) return _localTimer; return (s.evTimers||{})[id]||EVT_ZERO; }
+function evElapsed(s,id){ const t=evTimerOf(s,id); return t.running&&t.startMs?Math.max(0,syncNow()-t.startMs)+(t.accumulated||0):(t.accumulated||0); }
+function evTimerHtml(s,id,tag){ return `<span class="evt-t" data-evt="${Number(id)}">${fmtElapsed(evElapsed(s,id))}</span>`; }
+function evTimerSet(id,fn,msg,kind){ id=Number(id); const s=getStore(); if(id===s.liveEventId){ return; }
+  s.evTimers=s.evTimers||{}; const t=Object.assign({},EVT_ZERO,s.evTimers[id]||{}); const r=fn(t); if(r===false) return;
+  s.evTimers[id]=t; saveStore(s); if(msg) toast(msg,kind||'info'); if(typeof renderRunOfShow==='function'&&$('page-run')?.classList.contains('active')) renderRunOfShow(); }
+function evTimerStart(id){ const ev=eventById(getStore(),Number(id)); evTimerSet(id,t=>{ if(t.running){ toast('Timer already running','info'); return false; } t.running=true; t.startMs=syncNow(); },`⏱ ${ev?ev.name:''} — timer started`,'success'); }
+function evTimerPause(id){ evTimerSet(id,t=>{ if(!t.running) return false; t.accumulated=(t.accumulated||0)+Math.max(0,syncNow()-t.startMs); t.running=false; t.startMs=null; },'Timer paused','warning'); }
+function evTimerReset(id){ evTimerSet(id,t=>{ t.running=false; t.startMs=null; t.accumulated=0; },'Timer reset','info'); }
+function evTimerStop(s,id){ const t=(s.evTimers||{})[id]; if(t&&t.running){ t.accumulated=(t.accumulated||0)+Math.max(0,syncNow()-t.startMs); t.running=false; t.startMs=null; } }
+
+// main ↔ also-live swap keeps each event's own time
+setLiveEvent=(function(orig){ return function(id){
+  const s0=getStore(), oldMain=s0.liveEventId, oldT={..._localTimer}, newT=(s0.evTimers||{})[Number(id)];
+  const r=orig.apply(this,arguments); const s=getStore(); s.evTimers=s.evTimers||{}; let ch=false;
+  if(newT){ _localTimer={...EVT_ZERO,...newT}; s.timerState={..._localTimer}; delete s.evTimers[Number(id)]; ch=true; }
+  if(oldMain&&oldMain!==s.liveEventId&&(s.alsoLive||[]).includes(oldMain)&&(oldT.running||oldT.accumulated)){ s.evTimers[oldMain]={...oldT}; ch=true; }
+  if(ch) saveStore(s); return r; }; })(setLiveEvent);
+removeAlsoLive=(function(orig){ return function(id,finish){ const r=orig.apply(this,arguments); const s=getStore(), ev=eventById(s,Number(id));
+  if(ev&&(ev.status==='completed'||ev.status==='upcoming')&&(s.evTimers||{})[ev.id]){ if(ev.status==='upcoming') delete s.evTimers[ev.id]; else evTimerStop(s,ev.id); saveStore(s); }
+  return r; }; })(removeAlsoLive);
+
+// Run of Show: stopwatch buttons on every "also live" row
+multiLiveCard=(function(orig){ return function(){ let html=orig.apply(this,arguments); const s=getStore();
+  liveList(s).forEach(ev=>{ if(ev.id===s.liveEventId||ev.status==='completed') return; const t=evTimerOf(s,ev.id);
+    const ctl=`<span class="evt-ctl" style="display:inline-flex;gap:4px;align-items:center"><b style="font-family:'Teko',monospace;font-size:20px;min-width:92px;text-align:right;color:${t.running?'var(--green,#3fb950)':'#c9d1d9'}">${evTimerHtml(s,ev.id)}</b>
+      ${t.running?`<button class="btn xs warning" onclick="evTimerPause(${ev.id})">⏸ Pause</button>`:`<button class="btn xs primary" onclick="evTimerStart(${ev.id})">▶ Start</button>`}<button class="btn xs" onclick="evTimerReset(${ev.id})" title="Reset timer">↺</button></span>`;
+    html=html.replace(`<button class="btn xs" onclick="removeAlsoLive(${ev.id},true)">`,ctl+`<button class="btn xs" onclick="removeAlsoLive(${ev.id},true)">`); });
+  return html; }; })(multiLiveCard);
+
+// Big View: also-live slide + split columns show their own time
+buildFocusSlides=(function(orig){ return function(s){ const out=orig.apply(this,arguments); const L=screenList(s);
+  return out.map(sl=>{ let html=sl.html;
+    if(sl.key&&sl.key.indexOf('live:')===0){ const id=Number(sl.key.slice(5)), ev=eventById(s,id);
+      if(ev&&ev.status!=='completed') html=html.replace(/<div class="fv-timer"><small>ALSO LIVE<\/small><span>[^<]*<\/span><\/div>/,`<div class="fv-timer"><small>ALSO LIVE</small>${evTimerHtml(s,id)}</div>`); }
+    if(sl.key==='live'&&html.indexOf('fs-grid')>=0){ let k=0;
+      html=html.replace(/<div class="fs-col">([\s\S]*?)(<div class="fv-table"|<div class="fv-empty")/g,(m,head,tail)=>{ const ev=L.slice(0,4)[k++]; if(!ev||ev.id===s.liveEventId||ev.status==='completed'||head.indexOf('fv-timer')>=0) return m;
+        return `<div class="fs-col">${head}<div class="fv-timer">${evTimerHtml(s,ev.id)}</div>${tail}`; }); }
+    return html===sl.html?sl:Object.assign({},sl,{html}); }); }; })(buildFocusSlides);
+
+// LED Dashboard: when it shows an "also live" event, the big ELAPSED clock shows that event's time
+ledAltLive=(function(orig){ return function(){ const r=orig.apply(this,arguments); const s=getStore(), id=screenEventId(s), scr=$('led-screen');
+  if(scr){ const alt=scr.classList.contains('alt-live'), ev=alt?eventById(s,id):null; scr.classList.toggle('alt-timer',!!(ev&&ev.status!=='completed')); scr.dataset.altEv=alt&&ev?ev.id:''; }
+  return r; }; })(ledAltLive);
+updateTimerUI=(function(orig){ return function(){ const r=orig.apply(this,arguments); const scr=$('led-screen');
+  if(scr&&scr.classList.contains('alt-timer')&&scr.dataset.altEv) setText('d-elapsed',fmtElapsed(evElapsed(getStore(),scr.dataset.altEv)));
+  return r; }; })(updateTimerUI);
+
+// public page: ALSO LIVE cards get their own running time
+renderPublic=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ const s=getStore();
+  document.querySelectorAll('#public-screen .pb-card.pb-live').forEach(card=>{ if(card.querySelector('.evt-t')||!/ALSO LIVE/.test(card.querySelector('.pb-kick')?.textContent||'')) return;
+    const name=card.querySelector('.pb-title')?.textContent, ev=s.events.find(e=>e.name===name); if(!ev||ev.status==='completed') return;
+    card.insertAdjacentHTML('beforeend',`<div class="flex jcsb aic" style="margin-top:8px"><span class="pb-st live">LIVE</span><span class="pb-timer">${evTimerHtml(s,ev.id)}</span></div>`); }); }catch(e){ console.warn(e); } return r; }; })(renderPublic);
+
+// referee phone: an also-live event shows its own time, not the main event's
+setInterval(()=>{ const s=getStore();
+  document.querySelectorAll('.evt-t[data-evt]').forEach(el=>{ const t=fmtElapsed(evElapsed(s,el.dataset.evt)); if(el.textContent!==t) el.textContent=t; });
+  const rp=$('rp-elapsed'); if(rp&&typeof _refEventId!=='undefined'&&_refEventId!=null&&Number(_refEventId)!==s.liveEventId){ rp.id='rp-elapsed-ev'; rp.className='evt-t'; rp.dataset.evt=Number(_refEventId); rp.textContent=fmtElapsed(evElapsed(s,_refEventId)); }
+},150);
+
+// public phones also get each live event's own timer
+pubPayload=(function(orig){ return function(s){ const d=orig.apply(this,arguments); d.evTimers=s.evTimers||{}; d.alsoLive=s.alsoLive||[]; return d; }; })(pubPayload);
+applyPublicFeed=(function(orig){ return function(d){ const r=orig.apply(this,arguments); if(d&&(d.evTimers||d.alsoLive)){ const s=getStore(); s.evTimers=d.evTimers||{}; s.alsoLive=d.alsoLive||[];
+  _applyingRemote=true; try{ saveStore(s); }finally{ _applyingRemote=false; } if(isActive('public-screen')) renderPublic(); } return r; }; })(applyPublicFeed);
+(function(){ const st=document.createElement('style'); st.textContent='#led-screen.alt-live.alt-timer div:has(> #d-elapsed){visibility:visible}'; document.head.appendChild(st); })();
 
 handleUrlParams();
 </script>
