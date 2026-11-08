@@ -9909,7 +9909,7 @@ function renderRunOfShow(){
     <div class="card"><div class="card-hdr"><div class="card-title">⏭ NEXT UP</div></div><div>
       ${nx.map(e=>{ const mm=minsUntilEv(e); return `<div class="ros-next"><div class="ros-nt">${esc(e.time||'--:--')}${mm!=null?`<small>${mm>0?'in '+mm+' min':e.status==='delayed'?'delayed':'due'}</small>`:''}</div>
         <div style="flex:1;min-width:0"><div style="font-weight:700;color:#e6edf3">${esc(e.name)}</div><div style="font-size:12px;color:#8b949e">${esc(e.venue)} · call room ${crTxt(e)}${(s.callAnnounced||{})[e.id]?' · 📢 called':''}</div></div>
-        <div class="flex gap8"><button class="btn xs warning" onclick="announceCall(${e.id})">📢 Call</button><button class="btn xs primary" onclick="setLiveEvent(${e.id})">Live</button></div></div>`; }).join('')||'<div style="padding:16px;color:#8b949e">Nothing scheduled</div>'}
+        <div class="flex gap8"><button class="btn xs warning" onclick="announceCall(${e.id})">📢 Call</button><button class="btn xs primary" onclick="controlLiveClick(${e.id})">Live</button></div></div>`; }).join('')||'<div style="padding:16px;color:#8b949e">Nothing scheduled</div>'}
     </div></div>
   </div>
   <div class="card"><div class="card-hdr"><div class="card-title">🔔 NEEDS ATTENTION</div><span style="font-size:12px;color:#8b949e">${al.length} item(s)</span></div><div>
@@ -12333,7 +12333,7 @@ function ledNavRender(){ const b=document.querySelector('#led-screen .topbar but
 function fvShowCtrl(ms){ const fs=$('focus-screen'); if(!fs) return; fs.classList.add('fv-show'); clearTimeout(_fvHideT); _fvHideT=setTimeout(()=>fs.classList.remove('fv-show'),ms||3500); }
 (function(){
   const st=document.createElement('style');
-  st.textContent=`#focus-screen:not(.fv-show) .fv-ctrl{opacity:0} #focus-screen.fv-show .fv-ctrl,#focus-screen .fv-ctrl:hover{opacity:1}
+  st.textContent=`#focus-screen:not(.fv-show) .fv-ctrl{opacity:0;pointer-events:none} #focus-screen.fv-show .fv-ctrl,#focus-screen .fv-ctrl:hover{opacity:1}
   #focus-screen .fv-ctrl{top:1vh;bottom:auto;left:1.5vw;right:auto;z-index:20;flex-wrap:wrap;background:rgba(0,0,0,.88);padding:8px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.6)}
   #focus-screen .fv-ctrl .fv-back{background:#ea580c;border-color:#fdba74;font-size:16px;padding:8px 16px}
   #focus-screen:not(.fv-show){cursor:none}
@@ -12430,6 +12430,61 @@ pubPayload=(function(orig){ return function(s){ const d=orig.apply(this,argument
 applyPublicFeed=(function(orig){ return function(d){ const r=orig.apply(this,arguments); if(d&&(d.evTimers||d.alsoLive)){ const s=getStore(); s.evTimers=d.evTimers||{}; s.alsoLive=d.alsoLive||[];
   _applyingRemote=true; try{ saveStore(s); }finally{ _applyingRemote=false; } if(isActive('public-screen')) renderPublic(); } return r; }; })(applyPublicFeed);
 (function(){ const st=document.createElement('style'); st.textContent='#led-screen.alt-live.alt-timer div:has(> #d-elapsed){visibility:visible}'; document.head.appendChild(st); })();
+
+// ═══════════════════════════════════════════════════
+// v19 — multi-live from the LIVE CONTROL page too + visible app version
+// Live Control (the first page of the control room) now shows every ALSO LIVE event under the main timer,
+// each with its own ▶ Start / ⏸ Pause / ↺ Reset. "Set Live Event" rows get a "➕ Also live" button, and
+// clicking another event while the main timer runs asks whether to keep both live.
+// ═══════════════════════════════════════════════════
+const KS_VERSION='v19';
+function lccAlsoHtml(){ const s=getStore(); const L=liveList(s).filter(e=>e.id!==s.liveEventId);
+  if(!L.length) return `<div style="font-size:12px;color:#8b949e;margin-top:10px">Race and field event at the same time? Use <b>➕ Also live</b> in the list below — each event gets its own timer.</div>`;
+  return `<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:10px"><div class="lcc-title" style="margin-bottom:6px">● Also live (${L.length}) — each has its own timer</div>`+
+    L.map(ev=>{ const t=evTimerOf(s,ev.id), fin=ev.status==='completed';
+      return `<div class="lcc-also-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0">
+        <span style="font-size:11px;padding:2px 7px;border-radius:5px;background:${fin?'#6e7681':'#1f6feb'};color:#fff">${fin?'FINISHED':'ALSO LIVE'}</span>
+        <b style="flex:1;min-width:150px;color:#e6edf3">${esc(ev.name)}</b>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:22px;color:${t.running?'var(--green,#3fb950)':'var(--gold)'};min-width:110px;text-align:right">${evTimerHtml(s,ev.id)}</span>
+        ${fin?'':(t.running?`<button class="btn xs warning" onclick="evTimerPause(${ev.id})">⏸ Pause</button>`:`<button class="btn xs primary" onclick="evTimerStart(${ev.id})">▶ Start</button>`)+`<button class="btn xs" onclick="evTimerReset(${ev.id})">↺ Reset</button><button class="btn xs info" onclick="removeAlsoLive(${ev.id},true)">✓ Finish</button>`}
+        <button class="btn xs" onclick="removeAlsoLive(${ev.id},false)" title="Remove from live">✕</button></div>`; }).join('')+`</div>`; }
+function renderLccAlso(){ const card=document.querySelector('#page-control .live-control-card'); if(!card) return; let box=$('lcc-also');
+  if(!box){ card.insertAdjacentHTML('beforeend','<div id="lcc-also"></div>'); box=$('lcc-also'); } box.innerHTML=lccAlsoHtml(); }
+function controlLiveClick(id){ id=Number(id); const s=getStore(), cur=eventById(s,s.liveEventId), ev=eventById(s,id); if(!ev) return;
+  if(cur&&cur.id!==id&&cur.status!=='completed'&&ev.status!=='completed'&&ev.type!=='ceremony'&&!(s.alsoLive||[]).includes(id)){
+    if(confirm(`"${cur.name}" is LIVE now (timer ${fmtElapsed(elapsedMs())}).\n\nOK = keep BOTH live — "${ev.name}" becomes ALSO LIVE with its own timer\nCancel = switch — "${ev.name}" becomes the only live event`)) return addAlsoLive(id);
+  }
+  setLiveEvent(id); }
+renderEventPicker=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ const s=getStore(), also=s.alsoLive||[];
+  document.querySelectorAll('#a-event-picker > div').forEach(row=>{ const click=row.querySelector('div[onclick^="setLiveEvent("]'); if(!click) return;
+    const id=+(click.getAttribute('onclick').match(/\d+/)||[])[0]; const ev=eventById(s,id); if(!ev) return;
+    click.setAttribute('onclick',`controlLiveClick(${id})`);
+    row.querySelectorAll(`button[onclick="setLiveEvent(${id})"]`).forEach(bt=>{ bt.setAttribute('onclick',`event.stopPropagation();controlLiveClick(${id})`); if(also.includes(id)){ bt.textContent='⏱ Make main'; bt.title='Make this the main event (big timer)'; } });
+    const qr=row.querySelector('button[onclick^="showQrModal("]'); if(!qr||row.querySelector('.al-btn,.al-tag')) return;
+    if(also.includes(id)&&ev.status!=='completed'){ row.style.background='rgba(31,111,235,0.10)';
+      qr.insertAdjacentHTML('beforebegin',`<span class="al-tag" style="font-size:11px;color:#58a6ff;font-weight:700">ALSO LIVE · ${evTimerHtml(s,id)}</span>`); }
+    else if(id!==s.liveEventId&&ev.status!=='completed'&&ev.type!=='ceremony'&&s.liveEventId)
+      qr.insertAdjacentHTML('beforebegin',`<button class="btn xs al-btn" style="border-color:#1f6feb;color:#58a6ff" onclick="event.stopPropagation();addAlsoLive(${id})" title="Keep the current event live and add this one too">➕ Also live</button>`); });
+  renderLccAlso(); }catch(e){ console.warn(e); } return r; }; })(renderEventPicker);
+addAlsoLive=(function(orig){ return function(id){ const r=orig.apply(this,arguments); try{ renderEventPicker(); toast('Press ▶ Start next to it to run its own timer','info'); }catch(e){} return r; }; })(addAlsoLive);
+removeAlsoLive=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ renderEventPicker(); }catch(e){} return r; }; })(removeAlsoLive);
+evTimerSet=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ if($('page-control')?.classList.contains('active')) renderEventPicker(); }catch(e){} return r; }; })(evTimerSet);
+// screens update when another device changes the live list
+window.addEventListener('storage',()=>{ if(isActive('admin-screen')&&$('page-control')?.classList.contains('active')) setTimeout(renderLccAlso,50); });
+
+// Big View: a small "◀" tab always sits in the corner, so the way back is never invisible
+(function(){
+  const fs=$('focus-screen'); if(fs&&!$('fv-tab')) fs.insertAdjacentHTML('beforeend',`<button id="fv-tab" onclick="fvBack()" title="Back (Esc)">◀</button>`);
+  const st=document.createElement('style');
+  st.textContent=`#fv-tab{position:absolute;top:1vh;left:.6vw;z-index:19;width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.45);color:#fff;font-size:15px;opacity:.45;cursor:pointer}
+  #fv-tab:hover{opacity:1} #focus-screen.fv-show #fv-tab{display:none} body.wall-frame #fv-tab{display:none}
+  .ks-ver{font-size:11px;color:#8b949e;font-family:'Share Tech Mono',monospace;letter-spacing:1px}`;
+  document.head.appendChild(st);
+  // version label: launcher, control room, Big View bar
+  const lc=document.querySelector('#launcher .launcher-sub'); if(lc&&!lc.querySelector('.ks-ver')) lc.insertAdjacentHTML('beforeend',` <span class="ks-ver">· APP ${KS_VERSION}</span>`);
+  const ck=$('a-clock'); if(ck&&!$('a-ver')) ck.insertAdjacentHTML('afterend',`<span class="ks-ver" id="a-ver" title="App version">${KS_VERSION}</span>`);
+})();
+fvNavRender=(function(orig){ return function(){ const r=orig.apply(this,arguments); const c=document.querySelector('#focus-screen .fv-ctrl'); if(c&&!c.querySelector('.ks-ver')) c.insertAdjacentHTML('beforeend',`<span class="ks-ver" style="align-self:center;padding:0 6px">${KS_VERSION}</span>`); return r; }; })(fvNavRender);
 
 handleUrlParams();
 </script>
