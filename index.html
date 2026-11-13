@@ -3769,15 +3769,6 @@ body:has(#referee-screen.active) .toast-container{top:calc(10px + env(safe-area-
 }
 html body.ops-glass:not(.ops-light) #admin-screen .data-table tr:hover td{background:rgba(255,255,255,.06)!important}
 </style>
-<style id="perf-css">/* perf: running clocks change only their own box (no full-page relayout) */.hero-elapsed{contain:size layout style;height:1.17em;line-height:1.17;min-width:4.3em}#a-elapsed,#fv-timer,#d-clock,#a-clock,#ws-clock,#ws-bottom-clock,#fv-clock{font-variant-numeric:tabular-nums;contain:layout paint}</style>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0a0b0c">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Khele Sanand">
-<link rel="icon" type="image/png" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 
@@ -5067,19 +5058,7 @@ html body.ops-glass:not(.ops-light) #admin-screen .data-table tr:hover td{backgr
 function pad(n,d=2){ return String(Math.floor(n)).padStart(d,'0'); }
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function $(id){ return document.getElementById(id); }
-// Result for display in Olympic / World Athletics style:
-//   track: 9.58 · 47.32 · 1:43.25 · 27:43.22 · 2:01:09 (no leading zeros; 1/1000 rounds UP to the next 1/100, hand times keep 1/10)
-//   field: "8.95m" → "8.95 m"
-function resTxt(v){ const t=String(v==null?'':v).trim(); if(!t) return '';
-  const m=t.match(/^(\d+(?:\.\d+)?)\s*m$/i); if(m) return m[1]+' m';
-  if(!/^\d+(?::\d{1,2}){0,2}(?:\.\d+)?$/.test(t)) return t;
-  let sec=parseTime(t); if(isNaN(sec)) return t;
-  let dp=(t.split('.')[1]||'').length;
-  if(dp>2){ sec=Math.ceil(Math.round(sec*1000)/10)/100; dp=2; }
-  const cs=Math.round(sec*Math.pow(10,dp)), unit=Math.pow(10,dp), w=Math.floor(cs/unit), fr=dp?'.'+String(cs%unit).padStart(dp,'0'):'';
-  const h=Math.floor(w/3600), mi=Math.floor(w%3600/60), se=w%60, p2=n=>String(n).padStart(2,'0');
-  return h?`${h}:${p2(mi)}:${p2(se)}${fr}`:mi?`${mi}:${p2(se)}${fr}`:`${se}${fr}`; }
-function setText(id,v){ const el=$(id); if(!el) return; const t=v==null?'':String(v); if(el.textContent===t) return; const f=el.firstChild; if(f&&f.nodeType===3&&!f.nextSibling) f.nodeValue=t; else el.textContent=t; } // skip unchanged text; update text node in place (no page-wide re-scans)
+function setText(id,v){ const el=$(id); if(el) el.textContent=v; }
 // Parse a track time: "21.34", "21.34s", "1:02.34", "1:02:03.5" → seconds
 function parseTime(v){
   if(v==null) return NaN;
@@ -5339,7 +5318,7 @@ function renderDashboard(){
       return `<div class="res-row">
         <div class="rk ${cls}">${rankLabel(r)}</div>
         <div><div class="at-name">${esc(r.name)}</div><div class="at-sub">${esc(r.team)} · #${esc(r.bib||r.lane||'—')}</div></div>
-        <div><div class="res-time${r.rank===1?' best':''}">${esc(resTxt(r.result)||'—')}</div><div style="text-align:right;margin-top:1px">${flagBadge(r)}</div></div>
+        <div><div class="res-time${r.rank===1?' best':''}">${esc(r.result||'—')}</div><div style="text-align:right;margin-top:1px">${flagBadge(r)}</div></div>
         <div style="text-align:center;font-size:20px">${r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div>
       </div>`;
     }).join('');
@@ -5382,7 +5361,7 @@ function renderDashboard(){
   const cer=s.ceremony;
   const cerEl=$('d-ceremony');
   if(cer&&cer.event){
-    const place=(p,label,color)=>p&&p.name?`<div style="text-align:center;flex:1"><div style="font-family:'Teko',sans-serif;font-size:17px;font-weight:700;color:${color}">${esc(p.name)}</div><div style="font-size:10px;color:${color}">${label}${p.result?' · '+esc(resTxt(p.result)):''}</div>${p.team?`<div style="font-size:10px;color:var(--muted)">${esc(p.team)}</div>`:''}</div>`:'';
+    const place=(p,label,color)=>p&&p.name?`<div style="text-align:center;flex:1"><div style="font-family:'Teko',sans-serif;font-size:17px;font-weight:700;color:${color}">${esc(p.name)}</div><div style="font-size:10px;color:${color}">${label}${p.result?' · '+esc(p.result):''}</div>${p.team?`<div style="font-size:10px;color:var(--muted)">${esc(p.team)}</div>`:''}</div>`:'';
     cerEl.innerHTML=`<div style="background:rgba(0,230,118,0.06);border:1px solid rgba(0,230,118,0.15);border-radius:6px;padding:10px 12px">
       <div style="font-family:'Teko',sans-serif;font-size:17px;font-weight:600;color:var(--text);margin-bottom:5px">${esc(cer.event)}${cer.venue?` <span style="font-size:12px;color:var(--muted)">· ${esc(cer.venue)}</span>`:''}</div>
       <div style="display:flex;gap:8px">${place(cer.gold,'GOLD','var(--rank1)')}${place(cer.silver,'SILVER','var(--rank2)')}${place(cer.bronze,'BRONZE','var(--rank3)')}</div>
@@ -5392,7 +5371,7 @@ function renderDashboard(){
   }
   // Ticker (with fallback so the strip is never blank)
   let items=Object.entries(s.results).flatMap(([evName,rows])=>rows.filter(r=>r.result&&!r.dnf&&!r.dq&&r.rank<=3)
-    .map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) — ${resTxt(r.result)}${r.pb?' 🌟PB':r.sb?' SB':''}`));
+    .map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) — ${r.result}${r.pb?' 🌟PB':r.sb?' SB':''}`));
   if(items.length===0){
     items=[s.announcement||'Welcome to '+meetInfo().name, ...nextEvs.map(n=>`Coming up ${n.time}: ${n.name} @ ${n.venue}`)];
   }
@@ -5741,7 +5720,7 @@ function renderPublishedResults(){
           <div style="font-family:'Share Tech Mono',monospace;font-size:14px;color:${r.rank===1?'var(--rank1)':r.rank===2?'var(--rank2)':r.rank===3?'var(--rank3)':'var(--muted)'};width:24px">${rankLabel(r)}</div>
           <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--gold);width:48px">#${esc(r.bib||'—')}</div>
           <div style="flex:1;font-size:13px;font-weight:600">${esc(r.name)} <span style="color:#8b949e;font-weight:400">${esc(r.team)}</span></div>
-          <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--teal)">${esc(resTxt(r.result)||'—')}</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--teal)">${esc(r.result||'—')}</div>
           ${flagBadge(r)}
         </div>`).join('')}
     </div>`;
@@ -6421,7 +6400,7 @@ function fillSettingsForms(){
 let _raTimer=null;
 function showRecordAlert(name, time){
   const el=$('record-alert');
-  setText('ra-name',name); setText('ra-time',typeof resTxt==='function'?resTxt(time):time);
+  setText('ra-name',name); setText('ra-time',time);
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   clearTimeout(_raTimer); _raTimer=setTimeout(()=>el.classList.remove('show'), 3500);
 }
@@ -6435,9 +6414,8 @@ function updateTimerUI(){
   const el3=$('a-status-text');
   if(el3){
     const s=getStore(); const st=eventById(s,s.liveEventId)?.status;
-    const t3=_localTimer.running?'RUNNING':st==='delayed'?'DELAYED':!s.liveEventId?'STANDBY':elapsedMs()>0?'PAUSED':'READY';
-    if(el3.textContent!==t3) el3.textContent=t3;
-    const c3=_localTimer.running?'var(--green)':st==='delayed'?'var(--red)':'var(--gold)'; if(el3.style.color!==c3) el3.style.color=c3;
+    el3.textContent=_localTimer.running?'RUNNING':st==='delayed'?'DELAYED':!s.liveEventId?'STANDBY':elapsedMs()>0?'PAUSED':'READY';
+    el3.style.color=_localTimer.running?'var(--green)':st==='delayed'?'var(--red)':'var(--gold)';
   }
 }
 let _lastSec=-1, _tickN=0;
@@ -6637,7 +6615,7 @@ function liveResultSig(s){ const ev=eventById(s,s.liveEventId); return ev?ev.nam
 function resRowHtml(r){
   const g=r.rank===1?'g1':r.rank===2?'g2':r.rank===3?'g3':'';
   const flag=r.dq?['DQ','#ff2a00','#fff']:r.dns?['DNS','#ff2a00','#fff']:r.dnf?['DNF','#ff2a00','#fff']:r.pb?['PB','#00e050','#000']:r.sb?['SB','#00d8ff','#000']:null;
-  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(resTxt(r.result)||'—')}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
+  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(r.result||'—')}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
 }
 function buildFocusSlides(s){
   const d=getDisplay(), out=[];
@@ -6680,7 +6658,7 @@ function buildFocusSlides(s){
       ${md.map((m,i)=>`<div class="fv-medal"><span>${i+1}</span><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.team)}</div><span style="color:#ffd400">${m.g}</span><span>${m.s}</span><span style="color:#ff9a3c">${m.b}</span><span style="color:var(--teal)">${m.total}</span></div>`).join('')}`});
   }
   if(d.slides.ceremony&&s.ceremony&&s.ceremony.event){
-    const c=s.ceremony, col=(p,h,bg,num)=>p&&p.name?`<div class="col"><div class="who">${esc(p.name)}</div><div class="tm2">${esc([p.team,resTxt(p.result)].filter(Boolean).join(' · '))}</div><div class="blk" style="height:${h}vh;background:${bg}">${num}</div></div>`:'';
+    const c=s.ceremony, col=(p,h,bg,num)=>p&&p.name?`<div class="col"><div class="who">${esc(p.name)}</div><div class="tm2">${esc([p.team,p.result].filter(Boolean).join(' · '))}</div><div class="blk" style="height:${h}vh;background:${bg}">${num}</div></div>`:'';
     out.push({key:'ceremony',html:`<div class="fv-kicker">VICTORY CEREMONY${c.venue?' · '+esc(c.venue):''}</div><div class="fv-title">${esc(c.event)}</div>
       <div class="fv-pod">${col(c.silver,22,'#e6e6e6','2')}${col(c.gold,32,'#ffd400','1')}${col(c.bronze,15,'#ff9a3c','3')}</div>`});
   }
@@ -6705,7 +6683,7 @@ function renderFocus(reset){
   stage.innerHTML=_fvSlides.map((x,i)=>`<div class="fv-slide${i===_fvIdx?' on':''}">${x.html}</div>`).join('')+
     `<div class="fv-dots">${_fvSlides.map((x,i)=>`<b class="${i===_fvIdx?'on':''}"></b>`).join('')}</div>`;
   // bottom ticker
-  let items=Object.entries(s.results).flatMap(([evName,rows])=>rows.filter(r=>r.rank<=3&&!r.dnf&&!r.dq).map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) ${resTxt(r.result)}`));
+  let items=Object.entries(s.results).flatMap(([evName,rows])=>rows.filter(r=>r.rank<=3&&!r.dnf&&!r.dq).map(r=>`${evName}: ${r.rank===1?'🥇':r.rank===2?'🥈':'🥉'} ${r.name} (${r.team}) ${r.result}`));
   if(!items.length) items=[s.announcement||'Welcome to '+meetInfo().name];
   const txt=items.join('     ▶     ');
   const trk=$('fv-ticker');
@@ -6769,7 +6747,7 @@ window.addEventListener('storage',e=>{
 const _baseSaveStore=saveStore;
 saveStore=function(s){ _baseSaveStore(s); if(isActive('focus-screen')) refreshFocusInPlace(); };
 // live timer + periodic refresh (countdowns, auto mode)
-setInterval(()=>{ if(isActive('focus-screen')){ setText('fv-timer',fmtElapsed(elapsedMs())); setText('fv-clock',$('d-clock')?.textContent||''); } },100);
+setInterval(()=>{ if(isActive('focus-screen')){ const t=$('fv-timer'); if(t) t.textContent=fmtElapsed(elapsedMs()); setText('fv-clock',$('d-clock')?.textContent||''); } },100);
 setInterval(()=>{ applyDisplay(); if(isActive('led-screen')) renderDashboard(); if(isActive('focus-screen')) refreshFocusInPlace(); },30000);
 applyDisplay();
 
@@ -7608,7 +7586,7 @@ submitRefereeResults=function(){
   if(!entries.length){ toast('Enter at least one result before submitting','error'); return; }
   const bad=entries.filter(e=>e.invalid).length;
   const missing=athletes.length-entries.length;
-  const top=entries.filter(e=>e.rank<999).sort((a,b)=>a.rank-b.rank).slice(0,3).map((e,i)=>`${['🥇','🥈','🥉'][i]} ${e.name} — ${resTxt(e.result)}`).join('\n');
+  const top=entries.filter(e=>e.rank<999).sort((a,b)=>a.rank-b.rank).slice(0,3).map((e,i)=>`${['🥇','🥈','🥉'][i]} ${e.name} — ${e.result}`).join('\n');
   const finalOn=$('rp-final')?.checked!==false;
   if(!confirm(`Submit results for ${ev.name}?\n\n${top||'(no ranked results)'}${missing?`\n\n⚠ ${missing} athlete(s) have no result yet.`:''}${bad?`\n⚠ ${bad} time(s) could not be read.`:''}\n\n${finalOn?'Event will be marked FINISHED.':'Saved as provisional (event stays open).'}`)) return;
   if(finalOn){ ev.status='completed'; ev.finalAt=Date.now(); if(s.liveEventId===ev.id) s.liveEventId=null; promoteNext(s); }
@@ -7750,21 +7728,13 @@ async function readXlsx(file){
   }catch{}
   const sheet=await get(sheetPath); if(!sheet) throw new Error('Could not find a worksheet in this file');
   const colIdx=ref=>{ const L=ref.replace(/\d+/g,''); let n=0; for(const ch of L) n=n*26+(ch.charCodeAt(0)-64); return n-1; };
-  // photo links hidden behind a hyperlink (cell shows "Photo" but links to Drive) → use the link itself
-  const PHOTO_URL=/drive\.google\.com|docs\.google\.com|googleusercontent\.com|\.(jpe?g|png|webp)(\?|$)/i, links={};
-  try{ const sdoc=xml(sheet), relPath=sheetPath.replace(/([^/]+)$/,'_rels/$1.rels'), srel=await get(relPath);
-    const relMap={}; if(srel) [...xml(srel).getElementsByTagName('Relationship')].forEach(r=>relMap[r.getAttribute('Id')]=r.getAttribute('Target'));
-    [...sdoc.getElementsByTagName('hyperlink')].forEach(h=>{ const id=h.getAttribute('r:id')||h.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id'); const u=relMap[id]; if(u&&PHOTO_URL.test(u)) links[h.getAttribute('ref')]=u; });
-  }catch{}
   const rows=[];
   xml(sheet).querySelectorAll('sheetData row').forEach(r=>{
     const row=[];
     r.querySelectorAll('c').forEach(c=>{
       const t=c.getAttribute('t'), v=c.getElementsByTagName('v')[0]?.textContent;
       let val=t==='s'?ss[+v]:t==='inlineStr'?[...c.getElementsByTagName('t')].map(x=>x.textContent).join(''):t==='b'?(v==='1'?'TRUE':'FALSE'):(v??'');
-      const ref=c.getAttribute('r'), fx=c.getElementsByTagName('f')[0]?.textContent||'', hm=fx.match(/HYPERLINK\(\s*"([^"]+)"/i);
-      if(links[ref]&&!PHOTO_URL.test(String(val))) val=links[ref]; else if(hm&&PHOTO_URL.test(hm[1])) val=hm[1];
-      row[colIdx(ref)]=val;
+      row[colIdx(c.getAttribute('r'))]=val;
     });
     rows.push(Array.from(row,x=>x==null?'':String(x).trim()));
   });
@@ -7903,7 +7873,7 @@ function bulkTab(t){
         <div class="form-group"><div class="form-label">Categories (one per line)</div><textarea class="announce-area" id="gen-cats" style="min-height:150px">U-14 Boys\nU-14 Girls\nU-17 Boys\nU-17 Girls</textarea></div>
         <div class="form-group"><div class="form-label">Events</div>
           <div id="gen-discs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px;font-size:13px;color:#c9d1d9">
-            ${['30m','50m','60m','100m','200m','400m','800m','1500m','3000m','4x100m Relay','4x400m Relay','100m Hurdles','Long Jump','Standing Broad Jump','High Jump','Vertical Jump','Triple Jump','Shot Put','Discus Throw','Javelin Throw','Kids Javelin Throw','Softball Throw','Medicine Ball Throw'].map(d=>`<label><input type="checkbox" value="${d}" ${['100m','200m','400m','Long Jump','Shot Put'].includes(d)?'checked':''}> ${d}</label>`).join('')}
+            ${['100m','200m','400m','800m','1500m','3000m','4x100m Relay','4x400m Relay','100m Hurdles','Long Jump','High Jump','Triple Jump','Shot Put','Discus Throw','Javelin Throw'].map((d,i)=>`<label><input type="checkbox" value="${d}" ${i<3||d==='Long Jump'||d==='Shot Put'?'checked':''}> ${d}</label>`).join('')}
           </div>
           <input class="form-input" id="gen-custom" placeholder="Extra events, comma separated (e.g. 60m, Kabaddi Run)" style="margin-top:8px"></div>
       </div>
@@ -8307,7 +8277,7 @@ function renderLiveFeed(){
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;color:#e6edf3;font-size:14px">${esc(n)} <span class="td-badge" style="margin-left:6px;${m.provisional?'background:rgba(251,191,36,0.15);color:var(--gold)':'background:rgba(0,230,118,0.12);color:var(--green)'}">${m.provisional?'PROVISIONAL':'OFFICIAL'}</span>
         <span style="font-size:11px;color:#8b949e;font-weight:400"> · ${m.src==='referee'?'from referee':'by control room'} · ${s.results[n].length} athletes</span></div>
-        <div style="font-size:12px;color:#c9d1d9;margin-top:2px">${top.map((r,i)=>`${['🥇','🥈','🥉'][i]} ${esc(r.name)} <span style="color:var(--teal);font-family:'Share Tech Mono',monospace">${esc(resTxt(r.result))}</span>`).join(' &nbsp; ')||'<span style="color:#8b949e">entering…</span>'}</div>
+        <div style="font-size:12px;color:#c9d1d9;margin-top:2px">${top.map((r,i)=>`${['🥇','🥈','🥉'][i]} ${esc(r.name)} <span style="color:var(--teal);font-family:'Share Tech Mono',monospace">${esc(r.result)}</span>`).join(' &nbsp; ')||'<span style="color:#8b949e">entering…</span>'}</div>
       </div>
       ${m.provisional?`<button class="btn xs primary" onclick="approveResults(${ev.id})">✓ Make Official</button>`:''}
       <button class="btn xs" onclick="openResultsFor(${ev.id})">Open</button>
@@ -8747,7 +8717,7 @@ function qualifyToFinal(){
   });
   saveStore(s);
   $('q-out').innerHTML=`<div style="color:var(--green);margin-bottom:6px">✓ ${all.length} qualified to <b>${esc(fin.name)}</b> (${added} new entries, lanes ${field?'in order':'seeded centre-first'})</div>`+
-    all.map((x,i)=>`<div style="font-size:12px">${i+1}. ${esc(x.r.name)} <span style="color:#8b949e">${esc(x.r.team)} · ${esc(x.heat.replace(base,'').replace(/^\s*[—-]\s*/,''))}</span> <b style="color:var(--teal)">${esc(resTxt(x.r.result))}</b> <span class="td-badge" style="background:${x.how==='Q'?'rgba(0,230,118,0.15);color:var(--green)':'rgba(0,176,255,0.15);color:var(--blue)'}">${x.how}</span></div>`).join('');
+    all.map((x,i)=>`<div style="font-size:12px">${i+1}. ${esc(x.r.name)} <span style="color:#8b949e">${esc(x.r.team)} · ${esc(x.heat.replace(base,'').replace(/^\s*[—-]\s*/,''))}</span> <b style="color:var(--teal)">${esc(x.r.result)}</b> <span class="td-badge" style="background:${x.how==='Q'?'rgba(0,230,118,0.15);color:var(--green)':'rgba(0,176,255,0.15);color:var(--blue)'}">${x.how}</span></div>`).join('');
   populateSelects(); toast(`${all.length} athletes qualified to ${fin.name}`,'success');
 }
 
@@ -8818,7 +8788,7 @@ function pubResultsHtml(s,ev,limit){
   if(!rows.length) return '<div class="pb-empty">Results not in yet</div>';
   return (m&&m.provisional?'<div class="pb-prov">● LIVE ENTRY — provisional</div>':'')+rows.map(r=>`<div class="pb-row${r.rank===1?' g':r.rank===2?' s':r.rank===3?' b':''}">
     <div class="pb-rk">${rankLabel(r)}</div><div class="pb-nm">${esc(r.name)}<small>${esc(r.team)}${r.bib?' · #'+esc(r.bib):''}</small></div>
-    <div class="pb-res">${esc(resTxt(r.result)||'—')}${r.pb?'<i>PB</i>':r.sb?'<i>SB</i>':r.dnf?'<i class="x">DNF</i>':r.dq?'<i class="x">DQ</i>':r.dns?'<i class="x">DNS</i>':''}</div></div>`).join('');
+    <div class="pb-res">${esc(r.result||'—')}${r.pb?'<i>PB</i>':r.sb?'<i>SB</i>':r.dnf?'<i class="x">DNF</i>':r.dq?'<i class="x">DQ</i>':r.dns?'<i class="x">DNS</i>':''}</div></div>`).join('');
 }
 function renderPublic(){
   const box=$('pub-body'); if(!box) return;
@@ -8851,7 +8821,7 @@ function renderPublic(){
   }
   box.innerHTML=html;
 }
-setInterval(()=>{ if(isActive('public-screen')){ setText('pb-timer',fmtElapsed(elapsedMs())); setText('pb-clock',$('d-clock')?.textContent||''); } },250);
+setInterval(()=>{ if(isActive('public-screen')){ const t=$('pb-timer'); if(t) t.textContent=fmtElapsed(elapsedMs()); setText('pb-clock',$('d-clock')?.textContent||''); } },250);
 window.addEventListener('storage',e=>{ if((e.key==='khele_sync_tick'||e.key===STORE_KEY)&&isActive('public-screen')){ loadStore(); renderPublic(); } });
 setInterval(()=>{ if(isActive('public-screen')) renderPublic(); },15000);
 function renderPublicCard(){
@@ -9675,10 +9645,10 @@ resRowHtml=function(r){
   const g=r.rank===1?'g1':r.rank===2?'g2':r.rank===3?'g3':'';
   const flag=r.mr===true?['MR','#ffd400','#000']:r.dq?['DQ','#ff2a00','#fff']:r.dns?['DNS','#ff2a00','#fff']:r.dnf?['DNF','#ff2a00','#fff']:r.pb?['PB','#00e050','#000']:r.sb?['SB','#00d8ff','#000']:null;
   const wind=r.wind!=null&&r.wind!==''?`<span style="font-size:.45em;color:${r.wa?'#ff9a3c':'#c8d3db'};margin-left:.4em">${fmtWind(Number(r.wind))}${r.wa?'w':''}</span>`:'';
-  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(resTxt(r.result)||'—')}${wind}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
+  return `<div class="fv-res ${g}"><div class="p">${rankLabel(r)}</div><div><div class="n">${esc(r.name)}</div><div class="t">${esc(r.team)} · #${esc(r.bib||'—')}</div></div><div class="r">${esc(r.result||'—')}${wind}</div><div class="f" style="${flag?`background:${flag[1]};color:${flag[2]}`:''}">${flag?flag[0]:r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`;
 };
 const _opsPubRes=pubResultsHtml;
-pubResultsHtml=function(s,ev,limit){ let h=_opsPubRes(s,ev,limit); (s.results[ev.name]||[]).forEach(r=>{ if(r.mr===true) h=h.replace(`${esc(resTxt(r.result)||'—')}<`,`${esc(resTxt(r.result)||'—')}<i style="background:#ffd400;color:#000">MEET RECORD</i><`); }); return h; };
+pubResultsHtml=function(s,ev,limit){ let h=_opsPubRes(s,ev,limit); (s.results[ev.name]||[]).forEach(r=>{ if(r.mr===true) h=h.replace(`${esc(r.result||'—')}<`,`${esc(r.result||'—')}<i style="background:#ffd400;color:#000">MEET RECORD</i><`); }); return h; };
 // Records page
 function recordRows(s){ const keys=new Map(); s.events.forEach(e=>{ const k=recordKeyOf(e); if(k&&!keys.has(k)) keys.set(k,recordLabel(e.recordKey?(s.records[k]?.event||e.name):e.name)); }); Object.entries(s.records||{}).forEach(([k,r])=>{ if(!keys.has(k)) keys.set(k,r.event||k); }); return [...keys.entries()].sort((a,b)=>a[1].localeCompare(b[1])); }
 function renderRecords(){
@@ -9790,7 +9760,7 @@ openRefEvent=function(r){
 };
 
 // ───────────── MEET DETAILS, RESULT SHEETS, CERTIFICATES ─────────────
-function meetInfo(){ const st=getStore().settings; return {name:(st.meetName&&!/^\s*khele sanand athletics meet\s*$/i.test(st.meetName))?st.meetName:'Khele Sanand 2026',org:st.organiser||'Vijayi Bharat Foundation',venue:st.meetVenue||'Sanand, Gujarat',dates:st.meetDates||'',sign1:st.sign1||'Chief Referee',sign2:st.sign2||'Organising Secretary',logo:st.logo||''}; }
+function meetInfo(){ const st=getStore().settings; return {name:(st.meetName&&!/khele sanand athletics meet/i.test(st.meetName))?st.meetName:'Khele Sanand 2026',org:st.organiser||'Vijayi Bharat Foundation',venue:st.meetVenue||'Sanand, Gujarat',dates:st.meetDates||'',sign1:st.sign1||'Chief Referee',sign2:st.sign2||'Organising Secretary',logo:st.logo||''}; }
 function renderMeetCard(){ const m=meetInfo(); const set=(id,v)=>{ const el=$(id); if(el) el.value=v; }; set('mt-name',m.name); set('mt-org',m.org); set('mt-venue',m.venue); set('mt-dates',m.dates); set('mt-s1',m.sign1); set('mt-s2',m.sign2); const lp=$('mt-logo-prev'); if(lp) lp.innerHTML=m.logo?`<img src="${m.logo}" style="height:46px">`:'<span style="color:#8b949e;font-size:12px">No logo</span>'; }
 function saveMeetInfo(){ const s=getStore(), g=id=>$(id).value.trim(); Object.assign(s.settings,{meetName:g('mt-name'),organiser:g('mt-org'),meetVenue:g('mt-venue'),meetDates:g('mt-dates'),sign1:g('mt-s1'),sign2:g('mt-s2')}); saveStore(s); toast('Meet details saved','success'); }
 function uploadLogo(e){ const f=e.target.files[0]; e.target.value=''; if(!f) return; compressImage(f,360,0.85).then(d=>{ const s=getStore(); s.settings.logo=d; saveStore(s); renderMeetCard(); toast('Logo saved','success'); }); }
@@ -9816,7 +9786,7 @@ function sheetHtml(ev){
     <table class="info"><tr><td><b>Category:</b> ${esc(ev.category||'—')}</td><td><b>Round:</b> ${esc(ev.heat||'—')}</td><td><b>Venue:</b> ${esc(ev.venue||'—')}</td><td><b>Scheduled:</b> ${esc(ev.time||'—')}</td></tr>
       <tr><td><b>Status:</b> ${meta&&meta.provisional?'PROVISIONAL':rows.length?'OFFICIAL':'NO RESULTS'}</td><td><b>Wind:</b> ${wind!=null?fmtWind(wind)+' m/s':field&&needsWind(ev)?'per jump':'—'}</td><td><b>Entries:</b> ${ath.length} (${Object.values(cr).filter(v=>v==='in').length} checked in)</td><td><b>Meet record:</b> ${rec?esc(rec.mark)+' '+esc(rec.holder||''):'—'}</td></tr></table>
     <table class="res"><thead><tr><th>Pos</th><th>Lane</th><th>Bib</th><th>Athlete</th><th>Team / School</th>${field?(vert?heights.map(h=>`<th>${h}</th>`).join(''):'<th>T1</th><th>T2</th><th>T3</th>'):''}<th>Result</th><th>Remarks</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td class="c"><b>${rankLabel(r)}</b></td><td class="c">${esc(r.lane||'')}</td><td class="c">${esc(r.bib||'')}</td><td>${esc(r.name)}</td><td>${esc(r.team)}</td>${field?trialCells(r):''}<td class="c"><b>${esc(resTxt(r.result))}</b>${r.wind!=null&&field?`<br><small>${fmtWind(Number(r.wind))}</small>`:''}</td><td>${esc(remark(r))}</td></tr>`).join('')||'<tr><td colspan="9" class="c">No results entered</td></tr>'}
+    ${rows.map(r=>`<tr><td class="c"><b>${rankLabel(r)}</b></td><td class="c">${esc(r.lane||'')}</td><td class="c">${esc(r.bib||'')}</td><td>${esc(r.name)}</td><td>${esc(r.team)}</td>${field?trialCells(r):''}<td class="c"><b>${esc(r.result||'')}</b>${r.wind!=null&&field?`<br><small>${fmtWind(Number(r.wind))}</small>`:''}</td><td>${esc(remark(r))}</td></tr>`).join('')||'<tr><td colspan="9" class="c">No results entered</td></tr>'}
     </tbody></table>
     <div class="sig"><div>Track / Field Referee<br><span>Name &amp; signature</span></div><div>Chief Judge / Technical Official<br><span>Name &amp; signature</span></div><div>Results published at<br><span>${meta&&meta.at?new Date(meta.at).toLocaleString():'________________'}</span></div></div>
     <div class="ft">Printed ${new Date().toLocaleString()} · ${esc(m.name)}</div></div>`;
@@ -9831,7 +9801,7 @@ function certHtml(r,ev,place){
     <div class="title">${P?'Certificate of Merit':'Certificate of Participation'}</div>
     <div class="txt">This is to certify that</div><div class="nm">${esc(r.name)}</div><div class="txt">of <b>${esc(r.team)}</b>${r.bib?` (Bib ${esc(r.bib)})`:''}</div>
     <div class="txt">${P?`secured <b style="color:${P[2]}">${P[0]} PLACE — ${P[1]} MEDAL</b> in`:'participated in'}</div>
-    <div class="evn">${esc(ev.name)}</div>${P&&r.result?`<div class="txt">with a performance of <b>${esc(resTxt(r.result))}</b>${r.mr===true?' — <b>NEW MEET RECORD</b>':''}</div>`:''}
+    <div class="evn">${esc(ev.name)}</div>${P&&r.result?`<div class="txt">with a performance of <b>${esc(r.result)}</b>${r.mr===true?' — <b>NEW MEET RECORD</b>':''}</div>`:''}
     <div class="txt">held at ${esc(m.venue)}${m.dates?' on '+esc(m.dates):''}.</div>
     <div class="sg"><div>${esc(m.sign1)}</div><div>${esc(m.sign2)}</div></div></div></div></div>`;
 }
@@ -9909,13 +9879,13 @@ function renderRunOfShow(){
     <div class="card"><div class="card-hdr"><div class="card-title">⏭ NEXT UP</div></div><div>
       ${nx.map(e=>{ const mm=minsUntilEv(e); return `<div class="ros-next"><div class="ros-nt">${esc(e.time||'--:--')}${mm!=null?`<small>${mm>0?'in '+mm+' min':e.status==='delayed'?'delayed':'due'}</small>`:''}</div>
         <div style="flex:1;min-width:0"><div style="font-weight:700;color:#e6edf3">${esc(e.name)}</div><div style="font-size:12px;color:#8b949e">${esc(e.venue)} · call room ${crTxt(e)}${(s.callAnnounced||{})[e.id]?' · 📢 called':''}</div></div>
-        <div class="flex gap8"><button class="btn xs warning" onclick="announceCall(${e.id})">📢 Call</button><button class="btn xs primary" onclick="controlLiveClick(${e.id})">Live</button></div></div>`; }).join('')||'<div style="padding:16px;color:#8b949e">Nothing scheduled</div>'}
+        <div class="flex gap8"><button class="btn xs warning" onclick="announceCall(${e.id})">📢 Call</button><button class="btn xs primary" onclick="setLiveEvent(${e.id})">Live</button></div></div>`; }).join('')||'<div style="padding:16px;color:#8b949e">Nothing scheduled</div>'}
     </div></div>
   </div>
   <div class="card"><div class="card-hdr"><div class="card-title">🔔 NEEDS ATTENTION</div><span style="font-size:12px;color:#8b949e">${al.length} item(s)</span></div><div>
     ${al.map(([t,h,fix,lbl])=>`<div class="ros-alert ${t}"><span>${h}</span>${fix?`<button class="btn xs" onclick="${fix}">${lbl}</button>`:''}</div>`).join('')||'<div style="padding:14px 16px;color:var(--green)">✓ Nothing needs attention</div>'}</div></div>
   <div class="card"><div class="card-hdr"><div class="card-title">🧾 LATEST OFFICIAL RESULTS</div><div class="flex gap8"><button class="btn xs" onclick="printAllResultSheets()">🖨 All sheets</button><button class="btn xs" onclick="printCertificates(null,'medal')">🎖 All medal certificates</button></div></div><div>
-    ${sortedEvents(s).filter(e=>{ const m=resMeta(s,e.name); return (s.results[e.name]||[]).length&&!(m&&m.provisional); }).sort((a,b)=>(resMeta(s,b.name)?.at||0)-(resMeta(s,a.name)?.at||0)).slice(0,4).map(e=>{ const w=(s.results[e.name]||[]).find(r=>r.rank===1)||{}; return `<div class="ros-next"><div style="flex:1;min-width:0"><b style="color:#e6edf3">${esc(e.name)}</b><div style="font-size:12px;color:#8b949e">🥇 ${esc(w.name||'—')} ${esc(resTxt(w.result))}${w.mr===true?' · 🏆 MR':''}</div></div>
+    ${sortedEvents(s).filter(e=>{ const m=resMeta(s,e.name); return (s.results[e.name]||[]).length&&!(m&&m.provisional); }).sort((a,b)=>(resMeta(s,b.name)?.at||0)-(resMeta(s,a.name)?.at||0)).slice(0,4).map(e=>{ const w=(s.results[e.name]||[]).find(r=>r.rank===1)||{}; return `<div class="ros-next"><div style="flex:1;min-width:0"><b style="color:#e6edf3">${esc(e.name)}</b><div style="font-size:12px;color:#8b949e">🥇 ${esc(w.name||'—')} ${esc(w.result||'')}${w.mr===true?' · 🏆 MR':''}</div></div>
       <div class="flex gap8"><button class="btn xs" onclick="printResultSheet(${e.id})">🖨 Sheet</button><button class="btn xs" onclick="printCertificates(${e.id})">🎖 Certificates</button><button class="btn xs" onclick="generatePodium(${e.id},true)">🏅 Podium</button></div></div>`; }).join('')||'<div style="padding:14px 16px;color:#8b949e">No official results yet</div>'}</div></div>
   <div id="ros-check"></div>`;
   renderChecklist($('ros-check')); setSyncStatus(_syncStatus);
@@ -10082,7 +10052,7 @@ function pubPayload(s){
 }
 let _pubSig='', _pubT=null;
 const _f4PushState=pushState;
-pushState=function(){ _f4PushState(); if(!canWriteRoom()||_applyingRemote) return; clearTimeout(_pubT); _pubT=setTimeout(()=>{ const d=pubPayload(getStore()), sig=cyrb53(JSON.stringify(d)); if(sig!==_pubSig){ _pubSig=sig; queue('pub/data',d); queue('pub/v',Date.now()); } },700); };
+pushState=function(){ _f4PushState(); if(!canWriteRoom()||_applyingRemote) return; clearTimeout(_pubT); _pubT=setTimeout(()=>{ const d=pubPayload(getStore()), sig=cyrb53(JSON.stringify(d)); if(sig!==_pubSig){ _pubSig=sig; queue('pub/data',d); queue('pub/v',Date.now()); } },1500); };
 let _pubPollT=null, _pubV=null;
 async function pollPublic(){
   try{
@@ -10102,7 +10072,7 @@ function applyPublicFeed(d){
   if(!_firstData){ _firstData=true; _onFirstData.splice(0).forEach(f=>{ try{ f(); }catch{} }); }
   if(isActive('public-screen')) renderPublic();
 }
-function startPublicPoll(){ stopPublicPoll(); syncClock(); pollPublic(); _pubPollT=setInterval(pollPublic,4000+Math.round(Math.random()*2000)); /* tiny request; results reach spectators within ~5 s */ }
+function startPublicPoll(){ stopPublicPoll(); syncClock(); pollPublic(); _pubPollT=setInterval(pollPublic,8000+Math.round(Math.random()*4000)); }
 function stopPublicPoll(){ if(_pubPollT){ clearInterval(_pubPollT); _pubPollT=null; } }
 const _f4Connect=connectSync;
 connectSync=async function(){
@@ -10288,7 +10258,7 @@ printResultSheet=function(evId){ pcGo(false,{kind:'sheets',scope:'event',ev:evId
 
 function winnersHtml(evs){
   const s=getStore(), m=meetInfo();
-  const cell=(rs)=>rs.length?rs.map(r=>`<b>${esc(r.name)}</b><br><small>${esc(r.team)} · ${esc(resTxt(r.result))}${r.mr===true?' · MR':''}</small>`).join('<hr>'):'—';
+  const cell=(rs)=>rs.length?rs.map(r=>`<b>${esc(r.name)}</b><br><small>${esc(r.team)} · ${esc(r.result||'')}${r.mr===true?' · MR':''}</small>`).join('<hr>'):'—';
   const rows=evs.map(ev=>{ const rs=(s.results[ev.name]||[]).filter(r=>!r.dnf&&!r.dq&&!r.dns); const by=n=>rs.filter(r=>r.rank===n);
     const pv=(resMeta(s,ev.name)||{}).provisional; return `<tr><td><b>${esc(ev.name)}</b>${pv?'<br><small style="color:#c00">provisional</small>':''}</td><td>${cell(by(1))}</td><td>${cell(by(2))}</td><td>${cell(by(3))}</td></tr>`; }).join('');
   return `<div class="page"><div class="hd">${m.logo?`<img src="${m.logo}">`:''}<div><div class="t1">${esc(m.name)}</div><div class="t2">${esc(m.org)} · ${esc(m.venue)}${m.dates?' · '+esc(m.dates):''}</div></div></div>
@@ -10766,7 +10736,7 @@ const SH_KINDS=[
 function shHead(title){ const m=meetInfo(); return `*${m.name}*\n${title}\n`; }
 function shFoot(){ let t=''; if(publicUrlAvailable()) t+=`\n📱 Live results: ${publicUrl()}`; return t+`\n_${meetInfo().org}_`; }
 function shDay(ev){ return maxDay()>1?` · Day ${parseInt(ev.day)||1}`:''; }
-function shMark(r){ return r.result?`*${resTxt(r.result)}*`:''; }
+function shMark(r){ return r.result?`*${r.result}*`:''; }
 function shFlags(r){ return [r.mr===true?'🏆 MEET RECORD':r.mr==='='?'= MR':'',r.pb?'PB':'',r.sb?'SB':'',r.wa?'wind-assisted':''].filter(Boolean).join(' · '); }
 function shRank(r){ if(r.dns) return 'DNS'; if(r.dq) return 'DQ'; if(r.dnf) return 'DNF'; if(!(r.rank>=1&&r.rank<999)) return '—'; return r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':r.rank+'.'; }
 function shResultBlock(s,ev,top){
@@ -11609,910 +11579,112 @@ const _dkToggleGlass=toggleGlass;
 toggleGlass=function(ev){ _dkToggleGlass(ev); const p=$('glass-pop'); if(p&&!$('gp-dock')){ p.insertAdjacentHTML('beforeend','<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;cursor:pointer"><input type="checkbox" id="gp-dock" onchange="setDock(this.checked)"> Floating glass navbar</label>'); } if($('gp-dock')) $('gp-dock').checked=dockOn(); };
 applyDock();
 
-// ═══════════════════════════════════════════════════
-// REFEREE THANK-YOU LOCK — right after a FINAL submit from a QR/link phone,
-// the entry form closes and a Thank-you screen is shown (no more editing).
-// Provisional saves ("Final" unticked) keep the form open on purpose.
-// Corrections: control room uses Events → Reopen (creates a new QR).
-// ═══════════════════════════════════════════════════
-let _refTyTimer=null;
-function refThankYou(id){
-  const ev=eventById(getStore(),id); const name=ev?ev.name:'';
-  const link=getSync().mode!=='firebase';
-  if(link){
-    // Link mode: results still have to go by WhatsApp → keep the send panel, but lock all inputs
-    refResend(id);
-    setTimeout(()=>{ const p=$('ref-result-panel'); if(!p||$('ref-ty-banner')) return;
-      p.insertAdjacentHTML('afterbegin',`<div id="ref-ty-banner" style="padding:22px 16px;text-align:center;border:1px solid var(--green);border-radius:12px;margin-bottom:14px;background:rgba(0,230,118,.06)">
-        <div style="font-size:46px">🙏</div>
-        <div style="font-family:'Teko',sans-serif;font-size:28px;letter-spacing:2px;color:var(--green)">THANK YOU!</div>
-        <div style="font-size:14px;color:#c9d1d9;line-height:1.5">Results for <b>${esc(name)}</b> are saved and locked.<br>Last step: tap <b>Send on WhatsApp</b> below.</div></div>`);
-      p.scrollIntoView({behavior:'smooth',block:'start'}); },260);
-    return;
-  }
-  _refLocked=-1; lockReferee(); $('ref-event-selector').style.display='block'; $('ref-result-panel').style.display='none';
-  $('ref-event-list').innerHTML=`<div style="padding:40px 20px;text-align:center"><div style="font-size:56px;margin-bottom:6px">🙏</div>
-    <div style="font-family:'Teko',sans-serif;font-size:32px;letter-spacing:2px;color:var(--green);margin-bottom:6px">THANK YOU!</div>
-    <div style="font-size:15px;color:#c9d1d9;line-height:1.5">Results for <b>${esc(name)}</b> have been submitted.<br>Entry is now locked.</div>
-    <div id="ref-ty-status" style="margin-top:16px;font-size:14px;font-weight:700"></div>
-    <div style="font-size:12px;color:#8b949e;margin-top:14px">Need a correction? Ask the control room to reopen this event.</div></div>`;
-  document.querySelector('#ref-event-selector > div')?.style.setProperty('display','none'); setText('ref-event-badge','SUBMITTED');
-  const tick=()=>{ const el=$('ref-ty-status'); if(!el){ clearInterval(_refTyTimer); return; }
-    const n=Object.keys(outbox()).filter(k=>k.startsWith('inbox/')).length;
-    el.style.color=n?'var(--gold)':'var(--green)';
-    el.textContent=n?'⏳ Sending to control room… keep this page open until this turns green.':'✅ Sent to the control room. You can close this page.'; };
-  clearInterval(_refTyTimer); tick(); _refTyTimer=setInterval(tick,1500);
-}
-submitRefereeResults=(function(orig){ return function(){
-  const id=_refEventId, finalOn=$('rp-final')?.checked!==false;
-  const r=orig.apply(this,arguments);
-  if(id==null||!finalOn||!new URLSearchParams(location.search).has('eid')||isControlBrowser()) return r;
-  setTimeout(()=>{ // only when the submit really went through (not cancelled / not a validation error)
-    const ok=[...document.querySelectorAll('#referee-screen button')].some(x=>/SUBMITTED/.test(x.textContent));
-    if(!ok) return;
-    try{ localStorage.setItem(refDoneKey(id),String(Date.now())); }catch{}
-    refThankYou(id);
-  },300);
-  return r; }; })(submitRefereeResults);
-// a phone re-opening a submitted link sees the same Thank-you screen (Live Sync)
-refClosedScreen=(function(orig){ return function(id,title,msg,allowResend){
-  if(title==='RESULTS SUBMITTED'&&getSync().mode==='firebase') return refThankYou(id);
-  return orig.apply(this,arguments); }; })(refClosedScreen);
 
 // ═══════════════════════════════════════════════════
-// LIVE SYNC WATCHDOG — after a network drop or a database error the browser
-// closes the live connection for good; this reconnects automatically
-// (3s → 6s → 12s … max 30s), and also when the internet comes back.
+// ADMIN TOP BAR — tidy layout: brand · status · main actions · ☰ menu (less-used options)
 // ═══════════════════════════════════════════════════
-openStream=(function(orig){ return function(){
-  const es=orig.apply(this,arguments); es._last=Date.now();
-  const mark=()=>{ es._last=Date.now(); };
-  ['open','put','patch','keep-alive'].forEach(t=>es.addEventListener(t,mark));
-  return es; }; })(openStream);
-let _wdFails=0, _wdNext=0, _wdBusy=false;
-async function syncWatchdog(){
-  const c=getSync(); if(c.mode!=='firebase'||c.role==='public'||!c.dbUrl||!c.room||_wdBusy||_syncStatus==='connecting') return; // spectators poll, they have no live connection
-  const now=Date.now();
-  const dead=!_streams.length||_streams.some(s=>s.readyState===2||(s.readyState===1&&now-(s._last||0)>180000));
-  if(!dead){ _wdFails=0; return; }
-  if(now<_wdNext) return;
-  _wdBusy=true;
-  try{ await connectSync(); }catch(e){ setSyncStatus('error','Reconnecting… '+(e&&e.message||'')); }
-  finally{ _wdBusy=false; _wdFails++; _wdNext=Date.now()+Math.min(30000,3000*Math.pow(2,Math.min(_wdFails-1,4))); }
+(function(){
+  const bar=document.querySelector('#admin-screen .admin-topbar'); if(!bar) return;
+  const brand=bar.querySelector('.admin-brand'), acts=bar.querySelector('.admin-actions');
+  const find=re=>[...acts.querySelectorAll(':scope > button')].find(b=>re.test(b.getAttribute('onclick')||''));
+  const back=brand.querySelector('button'), pill=acts.querySelector('.sync-pill'), clock=$('a-clock');
+  const bAnn=find(/announceModal/), bVoice=acts.querySelector('.vc-on-btn'), bStop=acts.querySelector('.vc-stop-btn'), bWa=find(/openShare/), bPrint=find(/openPrintCentre/), bSync=find(/syncDashboard/);
+  const hidden=[find(/saveScreenSettings\('focus'\)/),find(/showScreen\('waiting'\)/),acts.querySelector('.glass-icon'),acts.querySelector('.ops-theme-btn'),find(/lockAdmin/)];
+  // left: back + brand
+  back.innerHTML='←'; back.title='Back to the Start screen'; back.className='btn tb-back';
+  const tag=brand.querySelector('.admin-tag'); if(tag) tag.textContent='CONTROL ROOM';
+  // status capsule
+  const status=document.createElement('div'); status.className='tb-status'; if(pill) status.appendChild(pill); if(clock) status.appendChild(clock);
+  // action capsule
+  const grp=document.createElement('div'); grp.className='tb-group';
+  const lab=(b,icon,text,title)=>{ if(!b) return; b.innerHTML=`<span class="tb-ic">${icon}</span><span class="tb-tx">${text}</span>`; if(title) b.title=title; b.classList.add('tb-btn'); grp.appendChild(b); };
+  lab(bAnn,'📢','Announce','Publish an announcement on the screens (and speak it)');
+  lab(bVoice,'🔊','Voice','Voice announcements on the PA'); if(bStop){ bStop.classList.add('tb-btn'); grp.appendChild(bStop); }
+  lab(bWa,'💬','Share','Share results, schedule, lists on WhatsApp');
+  lab(bPrint,'🖨','Print','Print Centre — result sheets, certificates, QR codes');
+  const sep=document.createElement('span'); sep.className='tb-sep'; grp.appendChild(sep);
+  lab(bSync,'⚡','Sync','Push the latest data to every screen now');
+  // menu
+  const menuBtn=document.createElement('button'); menuBtn.className='btn tb-btn tb-menu-btn'; menuBtn.type='button'; menuBtn.title='More options';
+  menuBtn.innerHTML='<span class="tb-ic">☰</span><span class="tb-tx">Menu</span>'; menuBtn.onclick=e=>{ e.stopPropagation(); tbMenu(); }; grp.appendChild(menuBtn);
+  hidden.forEach(b=>{ if(b){ b.style.display='none'; b.classList.add('tb-hidden'); } });
+  acts.prepend(status); acts.appendChild(grp);
+  // keep the voice button's ON state readable after relabelling
+  const _badge=ttsBadge; ttsBadge=function(){ _badge(); const c=ttsCfg(); document.querySelectorAll('.tb-group .vc-on-btn').forEach(b=>{ b.innerHTML=`<span class="tb-ic">🔊</span><span class="tb-tx">${c.on?'Voice ON':'Voice'}</span>`; b.classList.toggle('on',c.on); }); };
+  ttsBadge();
+  const m=document.createElement('div'); m.id='tb-menu'; m.setAttribute('role','menu'); document.body.appendChild(m);
+  document.addEventListener('pointerdown',e=>{ if(m.classList.contains('open')&&!m.contains(e.target)&&!e.target.closest('.tb-menu-btn')) m.classList.remove('open'); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') m.classList.remove('open'); });
+  window.addEventListener('resize',()=>m.classList.remove('open'));
+})();
+function tbMenu(){
+  const m=$('tb-menu'); if(m.classList.contains('open')){ m.classList.remove('open'); return; }
+  const light=opsTheme()==='light', g=glassLevel(), item=(ic,t,sub,fn,cls)=>`<button class="tb-mi ${cls||''}" onclick="$('tb-menu').classList.remove('open');${fn}"><span class="mi-ic">${ic}</span><span class="mi-t">${t}${sub?`<small>${sub}</small>`:''}</span></button>`;
+  m.innerHTML=`<div class="tb-sec">Screens</div>
+    ${item('📺','Big View on ground screens','Large-text view for far-away screens',"saveScreenSettings('focus')")}
+    ${item('🎬','Waiting screen','Before the meet / breaks',"showScreen('waiting')")}
+    ${item('🖥','LED dashboard','Open it on this device',"showScreen('led')")}
+    <div class="tb-sec">Appearance</div>
+    ${item(light?'🌙':'☀️',light?'Dark panels':'Light panels','Control panels only — LED unchanged',"toggleOpsTheme();")}
+    ${item('✨','Liquid glass look',g?`Level ${g}% · tap to adjust`:'Off · tap to turn on',"toggleGlass({currentTarget:document.querySelector('.tb-menu-btn')})")}
+    ${typeof dockOn==='function'?item('⬚',dockOn()?'Hide floating navbar':'Show floating navbar','Glass dock at the bottom',"setDock(!dockOn())"):''}
+    <div class="tb-sec">Safety</div>
+    ${item('🔒','Lock control room','PIN needed to come back',"lockAdmin()",'danger')}
+    ${item('←','Start screen','Leave the Admin panel',"showScreen('launcher')")}`;
+  const r=document.querySelector('.tb-menu-btn').getBoundingClientRect();
+  m.style.top=Math.round(r.bottom+8)+'px'; m.style.right=Math.max(8,Math.round(innerWidth-r.right))+'px';
+  m.classList.add('open');
 }
-setInterval(syncWatchdog,3000);
-window.addEventListener('online',()=>{ _wdNext=0; setTimeout(syncWatchdog,500); });
-
-// ═══════════════════════════════════════════════════
-// RESULT SAFETY FIXES (Nov 2026)
-// 1) "1:75.00" is not a valid time (seconds must be under 60)
-// 2) impossible times (e.g. "123" typed for 12.3 → 1.23 s) are flagged "?" and not ranked
-// 3) field events: athletes with exactly the same series share the same place
-// 4) backups also carry the waiting-screen images
-// ═══════════════════════════════════════════════════
-parseTime=(function(orig){ return function(v){
-  const t=orig(v); if(isNaN(t)) return t;
-  const parts=String(v).trim().replace(/s$/i,'').replace(/,/g,'.').split(':');
-  if(parts.length>1&&parts.slice(1).some(p=>Number(p)>=60)) return NaN;
-  return t; }; })(parseTime);
-function raceDistance(name){
-  const n=String(name||'');
-  const relay=n.match(/(\d)\s*[x×]\s*(\d{2,4})\s*m?/i); if(relay) return (+relay[1])*(+relay[2]);
-  const m=n.match(/(?:^|[^\d-])(\d{2,5})\s*m(?:\b|tr|etre|eter)/i); return m?+m[1]:0;
-}
-function minPlausibleTime(evName){ const d=raceDistance(evName); return d?d/11:0; } // faster than 11 m/s is not humanly possible
-buildTrackEntries=(function(orig){ return function(athletes,getVal){
-  const evName=athletes[0]&&athletes[0].event; const floor=minPlausibleTime(evName);
-  if(!floor) return orig.apply(this,arguments);
-  return orig.call(this,athletes,a=>{ const v=getVal(a)||{}; const r=fmtTimeInput(String(v.result||'').trim());
-    const t=parseTime(r); if(r&&!isNaN(t)&&t<floor) return Object.assign({},v,{result:r+'?'}); return v; });
-}; })(buildTrackEntries);
-buildFieldEntries=(function(orig){ return function(athletes,getTrials){
-  const entries=orig.apply(this,arguments);
-  if(entries.some(e=>e.v)) return entries; // vertical jumps already handle ties
-  const series=e=>[1,2,3].map(n=>(e['s'+n]==='foul'||e['s'+n]==='pass')?NaN:parseMark(e['t'+n])).filter(x=>!isNaN(x)).sort((x,y)=>y-x).join('|');
-  const ranked=entries.filter(e=>e.rank<999).sort((a,b)=>a.rank-b.rank);
-  ranked.forEach((e,i)=>{ const p=ranked[i-1]; e.rank=(p&&series(p)===series(e))?p.rank:i+1; });
-  return entries; }; })(buildFieldEntries);
-backupFile=(function(orig){ return function(data,tag){ const imgs=getImages(); if(imgs.length) data.__images=imgs; return orig.apply(this,arguments); }; })(backupFile);
-migrate=(function(orig){ return function(s){ if(s&&Array.isArray(s.__images)){ if(s.__images.length) saveImages(s.__images); delete s.__images; } return orig.apply(this,arguments); }; })(migrate);
-
-// ═══════════════════════════════════════════════════
-// READINESS CHECKLIST — technical health items (offline copy, unsent results, storage space)
-// ═══════════════════════════════════════════════════
-function storageUsedPct(){ let n=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); n+=k.length+(localStorage.getItem(k)||'').length; } }catch{} return Math.round(n/5000000*100); }
-checklist=(function(orig){ return function(){
-  const list=orig.apply(this,arguments); const c=getSync();
-  if(/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator){
-    const sw=!!navigator.serviceWorker.controller;
-    list.push({ok:sw,t:sw?'Offline copy installed — the app opens even without internet':'Offline copy not ready yet — reload this page once while online',fix:'location.reload()'});
-  }
-  if(c.mode==='firebase'){ const n=Object.keys(outbox()).length; list.push({ok:!n,t:n?`${n} update(s) still waiting to be sent — check the internet`:'All updates delivered (nothing waiting to send)',fix:'flushOutbox()'}); }
-  const pct=storageUsedPct(); list.push({ok:pct<70,t:`Browser storage ${pct}% used${pct>=70?' — remove some waiting-screen images':''}`,fix:`showPage('page-waiting',document.querySelector('.nav-item[onclick*=page-waiting]'))`});
-  return list; }; })(checklist);
-
-// ═══════════════════════════════════════════════════
-// ATHLETE PHOTOS FROM GOOGLE DRIVE / WEB LINKS — "Photo link" column in Bulk Add Athletes (Excel / CSV / grid)
-// Drive files must be shared "Anyone with the link → Viewer".
-// The photo is downloaded and saved small on this laptop (works offline); if Google blocks that,
-// the link itself is kept and the photo shows whenever the device is online.
-// ═══════════════════════════════════════════════════
-ATH_FIELDS.push({k:'photo',label:'Photo link',w:160,al:['photo','photolink','photourl','photodrivelink','drivelink','drivephoto','image','imagelink','imageurl','picture','pic','photograph','uploadphoto','athletephoto','passportphoto','photoupload']});
-function driveId(u){ const s=String(u||'').trim();
-  const m=s.match(/drive\.google\.com\/file\/d\/([\w-]{10,})/)||s.match(/drive\.google\.com\/(?:open|uc|thumbnail)\?(?:[^#]*&)?id=([\w-]{10,})/)||s.match(/docs\.google\.com\/uc\?(?:[^#]*&)?id=([\w-]{10,})/)||s.match(/googleusercontent\.com\/d\/([\w-]{10,})/);
-  return m?m[1]:null; }
-function photoSources(u){ const s=String(u||'').trim(), id=driveId(s);
-  if(id) return [`https://lh3.googleusercontent.com/d/${id}=w600`,`https://drive.google.com/thumbnail?id=${id}&sz=w600`];
-  if(/drive\.google\.com\/drive\/folders\//.test(s)) return [];      // a folder link is not a photo
-  return /^https?:\/\/\S+$/i.test(s)?[s]:[]; }
-function loadImg(src,cors){ return new Promise((res,rej)=>{ const im=new Image(); if(cors) im.crossOrigin='anonymous'; im.referrerPolicy='no-referrer';
-  const t=setTimeout(()=>{ im.src=''; rej(new Error('timeout')); },20000);
-  im.onload=()=>{ clearTimeout(t); (im.naturalWidth>1?res:rej)(im); }; im.onerror=()=>{ clearTimeout(t); rej(new Error('load')); }; im.src=src; }); }
-function driveKey(){ try{ return (localStorage.getItem('ks_drive_key')||getSync().apiKey||'').trim(); }catch{ return ''; } }
-function setDriveKey(){ const k=prompt('Google API key for Drive photos (starts with AIza…).\nLeave empty to use the Firebase Web API key.',localStorage.getItem('ks_drive_key')||''); if(k===null) return false;
-  try{ k.trim()?localStorage.setItem('ks_drive_key',k.trim()):localStorage.removeItem('ks_drive_key'); }catch{} toast('Drive photo key saved','success'); return true; }
-async function blobToPhoto(blob){
-  if(/heic|heif/i.test(blob.type||'')) throw new Error('iPhone HEIC photo — save it as JPG first');
-  let src; try{ src=await createImageBitmap(blob); }catch{ const u=URL.createObjectURL(blob); try{ src=await loadImg(u,false); }catch{ throw new Error('not an image (JPG / PNG needed)'); } finally{ setTimeout(()=>URL.revokeObjectURL(u),2000); } }
-  return cropToPhoto(src); }
-// Official Google Drive API — works from any website for files shared "Anyone with the link"
-async function driveApiPhoto(id,key){
-  let r; try{ r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&key=${encodeURIComponent(key)}`); }catch{ throw new Error('no internet / Google not reachable'); }
-  if(r.ok) return blobToPhoto(await r.blob());
-  let txt=''; try{ const j=await r.json(); const e=j.error||{}; txt=[e.message,e.status,...(e.errors||[]).map(x=>x.reason)].join(' '); }catch{}
-  const err=m=>{ const e=new Error(m); return e; };
-  if(/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(txt)){ const e=err('Google Drive API is not switched on for this key'); e.setup=true; throw e; }
-  if(/API_KEY_SERVICE_BLOCKED|are blocked|keyInvalid|API key not valid|referer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(txt)){ const e=err('this API key is not allowed to use Google Drive'); e.setup=true; throw e; }
-  if(r.status===404) throw err('not found — share it as “Anyone with the link” (not only your organisation)');
-  if(r.status===403) throw err('Google refused — share it as “Anyone with the link”');
-  throw err('Google error '+r.status); }
-async function fetchPhoto(u){
-  const s=String(u||'').trim(), id=driveId(s);
-  if(!id&&/drive\.google\.com\/drive\/folders\//.test(s)) throw new Error('folder link — use each photo’s own link (or upload the folder as ZIP)');
-  let firstErr=null;
-  if(id){ const key=driveKey();
-    if(key){ try{ return await driveApiPhoto(id,key); }catch(e){ firstErr=e; } }
-    else firstErr=Object.assign(new Error('no Google API key set for Drive photos'),{setup:true});
-    for(const src of [`https://drive.google.com/thumbnail?id=${id}&sz=w600`,`https://lh3.googleusercontent.com/d/${id}=w600`]){ try{ return cropToPhoto(await loadImg(src,true)); }catch{} }
-    for(const src of [`https://drive.google.com/thumbnail?id=${id}&sz=w600`,`https://lh3.googleusercontent.com/d/${id}=w600`]){ try{ await loadImg(src,false); return src; }catch{} }
-    throw firstErr||new Error('not shared publicly (Anyone with the link)'); }
-  if(!/^https?:\/\/\S+$/i.test(s)) throw new Error('not a photo link');
-  try{ return cropToPhoto(await loadImg(s,true)); }catch{}
-  try{ await loadImg(s,false); return s; }catch{}
-  throw new Error('photo could not be opened'); }
-let _photoJob=null;
-function photoJobBox(html){ let b=$('photo-job'); if(!b){ b=document.createElement('div'); b.id='photo-job';
-    b.style.cssText='position:fixed;left:16px;bottom:16px;z-index:9999;max-width:min(440px,calc(100vw - 32px));background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:10px;padding:12px 14px;font:13px/1.45 Barlow,Arial,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
-    document.body.appendChild(b); }
-  b.innerHTML=html; return b; }
-const DRIVE_SETUP_HELP=`<div style="font-size:12px;color:#c9d1d9;margin-top:6px;background:#0d1117;border-radius:6px;padding:8px 10px;line-height:1.6"><b style="color:var(--gold)">One-time setup (3 min):</b><br>
-1. Open <b>console.cloud.google.com</b> → top bar: pick your <b>Firebase project</b>.<br>
-2. <i>APIs &amp; Services → Library</i> → search <b>Google Drive API</b> → <b>Enable</b>.<br>
-3. <i>APIs &amp; Services → Credentials</i> → open the <b>Browser key</b> → if “API restrictions” is on, tick <b>Google Drive API</b> too → Save. (Or <i>Create credentials → API key</i>.)<br>
-4. Press <b>🔑 Key</b> below (empty = use the Firebase key) → <b>Retry</b>.</div>`;
-async function runPhotoJob(list){
-  if(!list.length) return; if(_photoJob) _photoJob.cancel=true;
-  const job=_photoJob={cancel:false,failedItems:[]}; let done=0, saved=0, linked=0, setup=false; const failed=[];
-  const draw=()=>photoJobBox(`📷 <b>Athlete photos</b> — ${done}/${list.length}<div style="height:6px;background:#30363d;border-radius:3px;margin:6px 0"><div style="height:6px;width:${Math.round(done/list.length*100)}%;background:var(--green);border-radius:3px"></div></div><span style="color:#8b949e">You can keep working.</span> <button class="btn xs" onclick="_photoJob&&(_photoJob.cancel=true)">Stop</button>`);
-  draw(); let i=0;
-  const worker=async()=>{ while(i<list.length&&!job.cancel){ const it=list[i++];
-      try{ const d=await fetchPhoto(it.url); if(job.cancel) break; PhotoDB.put(it.key,d); d.startsWith('data:')?saved++:linked++; }
-      catch(e){ failed.push(`${it.name}: ${e.message}`); job.failedItems.push(it); if(e.setup) setup=true; }
-      done++; draw(); } };
-  await Promise.all([worker(),worker(),worker()]);
-  afterPhotoChange(); if(_photoJob===job) _photoJob=null;
-  window._photoRetry=job.failedItems;
-  photoJobBox(`📷 <b>Athlete photos ${job.cancel?'stopped':'done'}</b><br>✅ ${saved} saved on this laptop${linked?`<br>🔗 ${linked} saved as link (show only when online)`:''}${failed.length?`<br><span style="color:var(--red)">❌ ${failed.length} not loaded</span><div style="max-height:130px;overflow:auto;font-size:12px;color:#8b949e;margin-top:4px">${failed.map(esc).join('<br>')}</div>${setup?DRIVE_SETUP_HELP:'<div style="font-size:12px;margin-top:4px">Fix: Drive → Share → General access → <b>Anyone with the link</b>, then Retry. Or upload the photos as a ZIP (Athletes → 🖼 Photos ZIP).</div>'}`:''}
-    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap">${failed.length?`<button class="btn xs" onclick="setDriveKey()">🔑 Key</button><button class="btn xs primary" onclick="runPhotoJob(window._photoRetry||[])">↻ Retry ${failed.length}</button>`:''}<button class="btn xs" onclick="this.closest('#photo-job').remove()">Close</button></div>`);
-}
-// ── Photos from a ZIP / many image files: matched by file name = bib number or athlete name ──
-function photoMatch(fname,s){
-  const base=String(fname).split('/').pop().replace(/\.[a-z0-9]{2,5}$/i,'').trim();
-  const parts=[base,...base.split(/\s+-\s+|_+|\s*\(\d+\)\s*$/)].map(x=>x.trim()).filter(Boolean);
-  for(const p of parts){
-    const byBib=s.athletes.filter(a=>a.bib&&String(a.bib).toLowerCase()===p.toLowerCase()); if(byBib.length) return byBib;
-    const nk=normKey(p); if(nk.length<3) continue;
-    const byName=s.athletes.filter(a=>normKey(a.name)===nk); if(byName.length) return byName;
-  } return []; }
-async function importPhotoFiles(ev){
-  const files=[...(ev.target.files||[])]; ev.target.value=''; if(!files.length) return;
-  photoJobBox('📷 <b>Reading photos…</b>');
-  const items=[];
-  for(const f of files){
-    if(/\.zip$/i.test(f.name)){ let z; try{ z=fflate.unzipSync(new Uint8Array(await f.arrayBuffer())); }catch{ toast('Could not open '+f.name,'error'); continue; }
-      Object.entries(z).forEach(([n,b])=>{ if(/(^|\/)__MACOSX\/|\/$/.test(n)||!b.length) return; if(!/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(n)) return;
-        const ext=n.split('.').pop().toLowerCase(); items.push({name:n,blob:new Blob([b],{type:/heic|heif/.test(ext)?'image/heic':ext==='png'?'image/png':ext==='webp'?'image/webp':ext==='gif'?'image/gif':'image/jpeg'})}); }); }
-    else if(/^image\//.test(f.type)||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) items.push({name:f.name,blob:f});
-  }
-  if(!items.length){ photoJobBox('📷 No photos found (JPG / PNG, or a ZIP of them). <button class="btn xs" onclick="this.closest(\'#photo-job\').remove()">Close</button>'); return; }
-  const s=getStore(); let saved=0; const unmatched=[], bad=[], amb=[];
-  for(let i=0;i<items.length;i++){ const it=items[i];
-    if(i%5===0) photoJobBox(`📷 <b>Matching photos</b> — ${i}/${items.length}`);
-    const hits=photoMatch(it.name,s); const keys=[...new Set(hits.map(photoKey))];
-    if(!hits.length){ unmatched.push(it.name.split('/').pop()); continue; }
-    if(keys.length>1){ amb.push(it.name.split('/').pop()); continue; }
-    try{ PhotoDB.put(keys[0],await blobToPhoto(it.blob)); saved++; }catch(e){ bad.push(it.name.split('/').pop()+': '+e.message); }
-    await new Promise(r=>setTimeout(r,0)); }
-  afterPhotoChange();
-  const list=(t,arr)=>arr.length?`<br><span style="color:var(--gold)">${t} (${arr.length})</span><div style="max-height:90px;overflow:auto;font-size:12px;color:#8b949e">${arr.map(esc).join('<br>')}</div>`:'';
-  photoJobBox(`📷 <b>Photos imported</b><br>✅ ${saved} athlete photo(s) saved on this laptop${list('No athlete with this bib / name',unmatched)}${list('Same name in more than one athlete — rename file to the bib number',amb)}${list('Could not read',bad)}
-    <div style="font-size:12px;color:#8b949e;margin-top:6px">Tip: name each photo by <b>bib number</b> (e.g. <b>101.jpg</b>) or the athlete’s full name.</div><div style="text-align:right;margin-top:8px"><button class="btn xs" onclick="this.closest('#photo-job').remove()">Close</button></div>`);
-}
-// button next to "Bulk Add Athletes"
-function addPhotoZipButton(){ const b=document.querySelector('button[onclick="openBulk(\'athletes\')"]'); if(!b||$('photo-zip-btn')) return;
-  b.insertAdjacentHTML('afterend',`<label class="btn" id="photo-zip-btn" title="Upload a ZIP (or many JPG files) — photos are matched by bib number or athlete name" style="position:relative;overflow:hidden">🖼 Photos ZIP<input type="file" accept=".zip,image/*" multiple onchange="importPhotoFiles(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>`); }
-setTimeout(addPhotoZipButton,800); setInterval(addPhotoZipButton,3000);
-bulkImport=(function(orig){ return function(){
-  const want=_bulk.kind==='athletes'?(_bulk.preview||[]).filter(r=>['ok','warn','upd'].includes(r.status)&&r.data&&String(r.data.photo||'').trim()).map(r=>r.data):[];
-  const r=orig.apply(this,arguments);
-  if(want.length){ const s=getStore(), seen=new Set(), list=[];
-    want.forEach(d=>{ const a=[...s.athletes].reverse().find(x=>x.name===String(d.name).trim()&&x.event===d.event&&x.team.toLowerCase()===String(d.team).trim().toLowerCase()); if(!a) return;
-      const key=photoKey(a); if(seen.has(key)) return; seen.add(key); list.push({key,name:a.name,url:String(d.photo).trim()}); });
-    setTimeout(()=>runPhotoJob(list),300); }
-  return r; }; })(bulkImport);
-downloadBulkTemplate=(function(orig){ return function(kind){ if(kind!=='athletes') return orig.apply(this,arguments);
-  downloadFile('athletes-template.csv','﻿Name,Team,Event,Bib,Lane,DOB,Gender,Village/School,PB,Aadhaar last 4,Photo link\nRavi Thakor,Sanand,U-17 Boys 200m Final,,,12/04/2010,M,Sanand,24.10,1234,https://drive.google.com/file/d/FILE_ID/view?usp=sharing\nMeera Desai,Ahmedabad,U-17 Girls 200m Final,210,4,03/09/2010,F,Bopal,,5678,\n','text/csv'); }; })(downloadBulkTemplate);
-// backups: keep photo links too (not only saved images)
-migrate=(function(orig){ return function(s){ if(s&&s.__photos){ Object.entries(s.__photos).forEach(([k,v])=>{ if(typeof v==='string'&&/^https:\/\//.test(v)){ PhotoDB.put(k,v); delete s.__photos[k]; } }); } return orig.apply(this,arguments); }; })(migrate);
-
-// ═══════════════════════════════════════════════════
-// CERTIFICATE DESIGN v2 — A4 landscape, ornamental frame, logo + organisation + programme name,
-// event ribbon, athlete photo + bib + QR, medal seal, up to 3 signatures (image + name + designation).
-// Settings: Generate → "🎓 Certificate design". Wording follows the organiser's sample.
-// ═══════════════════════════════════════════════════
-const KC_THEMES={saffron:{name:'Saffron',main:'#e8590c',dark:'#1e2a5a',soft:'#fff4ec'},blue:{name:'Royal blue',main:'#1d4ed8',dark:'#13235b',soft:'#eef3ff'},
-  green:{name:'Green',main:'#15803d',dark:'#123b25',soft:'#edf8f1'},maroon:{name:'Maroon',main:'#9f1239',dark:'#3b0a1a',soft:'#fdf0f3'}};
-const KC_MEDAL={1:{w:'Gold',c:'#c9a227',c2:'#f3d97a',o:'1st'},2:{w:'Silver',c:'#8a96a3',c2:'#dde3e8',o:'2nd'},3:{w:'Bronze',c:'#a8602f',c2:'#e7b48a',o:'3rd'}};
-function certCfg(){
-  const st=getStore().settings, m=meetInfo(), c=st.cert||{};
-  const sigs=(Array.isArray(c.sigs)&&c.sigs.length?c.sigs:[{name:'',desig:m.sign1,org:'',img:''},{name:'',desig:m.sign2,org:'',img:''}]).slice(0,3);
-  return {brand:c.brand!=null?c.brand:'KHELE SANAND',tagline:c.tagline||'',venue:(c.venue!=null&&String(c.venue).trim()!=='')?String(c.venue).trim():(m.venue||''),from:c.from||'',to:c.to||'',teamWord:c.teamWord!=null?c.teamWord:'village team',
-    theme:KC_THEMES[c.theme]?c.theme:'saffron',photo:c.photo!==false,qr:c.qr!==false,wm:c.wm!==false,layout:['form','para','lines'].includes(c.layout)?c.layout:'form',sigs};
-}
-function kcDate(iso){ const d=iso?new Date(iso+'T00:00:00'):null; if(!d||isNaN(d)) return '';
-  const n=d.getDate(), suf=(n%10===1&&n!==11)?'st':(n%10===2&&n!==12)?'nd':(n%10===3&&n!==13)?'rd':'th';
-  return `${n}${suf} ${d.toLocaleString('en-IN',{month:'long'})} ${d.getFullYear()}`; }
-function kcEvent(n){ return String(n||'').replace(/\bU\s*-?\s*(\d{1,2})\b/g,'Under-$1').replace(/\s+Final$/i,'').trim(); }
-function kcAthlete(c){ const s=getStore(); return (c.bib&&s.athletes.find(a=>String(a.bib)===String(c.bib)))||s.athletes.find(a=>a.name===c.name&&a.team===c.team)||null; }
-function kcWords(g){ g=String(g||'').toLowerCase();
-  if(/^(m|male|boy)/.test(g)) return {hon:'Mr.',rel:'Son',pro:'He'}; if(/^(f|female|girl)/.test(g)) return {hon:'Ms.',rel:'Daughter',pro:'She'};
-  return {hon:'Mr./Ms.',rel:'Son/Daughter',pro:'He/She'}; }
-function kcQr(text){ try{ const d=document.createElement('div'); if(!makeQr(d,text,180)) return ''; return qrDataUrl(d)||''; }catch{ return ''; } }
-const KC_CORNER=`<svg viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M8 112V30Q8 8 30 8h82" stroke-width="2.4"/><path d="M16 112V34q0-18 18-18h78" stroke-width="1"/>
-  <path d="M24 64c0-22 12-38 34-40" stroke-width="1.3"/><path d="M64 24c-16 2-24 12-24 24 0 10 8 15 15 12 6-3 5-11-1-12" stroke-width="1.5"/>
-  <path d="M24 64c2-16 12-24 24-24 10 0 15 8 12 15-3 6-11 5-12-1" stroke-width="1.5"/>
-  <path d="M70 24c6-5 13-6 20-3M24 70c-5 6-6 13-3 20" stroke-width="1.2"/>
-  <path d="M30 30l7 3-3-7z" fill="currentColor" stroke-width=".8"/><circle cx="96" cy="16" r="2" fill="currentColor"/><circle cx="16" cy="96" r="2" fill="currentColor"/></g></svg>`;
-const KC_FLOURISH=`<svg viewBox="0 0 200 20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round"><path d="M4 10h70M126 10h70" stroke-width="1.2"/>
-  <path d="M74 10c8-8 18-8 26 0 8 8 18 8 26 0M74 10c8 8 18 8 26 0 8-8 18-8 26 0" stroke-width="1.3"/><circle cx="100" cy="10" r="2.6" fill="currentColor"/></g></svg>`;
-function kcSeal(place){ const M=KC_MEDAL[place]; if(!M) return '';
-  let pts=''; for(let i=0;i<48;i++){ const r=i%2?44:49, a=i*Math.PI/24; pts+=`${(50+r*Math.cos(a)).toFixed(1)},${(50+r*Math.sin(a)).toFixed(1)} `; }
-  return `<div class="kc-seal"><svg viewBox="0 0 100 128" aria-hidden="true"><path d="M30 80 18 126l14-8 10 10 8-46zM70 80l12 46-14-8-10 10-8-46z" fill="${M.c}"/>
-    <polygon points="${pts}" fill="${M.c}"/><circle cx="50" cy="50" r="37" fill="${M.c2}" stroke="#fff" stroke-width="2.5"/><circle cx="50" cy="50" r="31" fill="none" stroke="${M.c}" stroke-width="1.2" stroke-dasharray="2 2"/>
-    <text x="50" y="47" text-anchor="middle" font-family="Georgia,serif" font-size="20" font-weight="700" fill="#3a2a00">${M.o}</text>
-    <text x="50" y="64" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" letter-spacing="2" fill="#3a2a00">${M.w.toUpperCase()}</text></svg></div>`; }
-// the certificate page itself
-function kcCert(c){
-  const m=meetInfo(), K=certCfg(), T=KC_THEMES[K.theme], blank=!!c.blank, M=KC_MEDAL[c.place];
-  const a=blank?null:(c.ath||kcAthlete(c)), W=kcWords(c.gender!=null?c.gender:a&&a.gender);
-  const father=blank?'':(c.father!=null?c.father:(a&&a.father)||''), team=blank?'':(c.team||'');
-  const events=(c.events||[]).map(kcEvent).filter(Boolean), evTxt=events.join(', ');
-  // a filled value sits on a dotted line; an empty one is a writing line of fixed width
-  const F=(v,w)=>v?`<span class="fld">${esc(v)}</span>`:`<span class="fld blank" style="width:${w}mm">&nbsp;</span>`;
-  const from=kcDate(K.from), to=kcDate(K.to);
-  const when=from&&to&&K.from!==K.to?`from ${F(from)} to ${F(to)}`:from?`on ${F(from)}`:m.dates?`on ${F(m.dates)}`:'';
-  const where=K.venue?`organized at ${F(K.venue)}`:'organized';
-  const lines=[];
-  lines.push(`<div class="ln ln-lead">This certificate is awarded to</div>`);
-  lines.push(`<div class="ln ln-name"><span class="nm${blank?' blank':''}"><span class="hon">${blank?'Mr./Ms.':W.hon}</span> ${blank?'':esc(c.name||'')}</span></div>`);
-  const fam=[]; if(blank||father) fam.push(`${blank?'Son/Daughter':W.rel} of ${F(father,62)}`); if(blank||team) fam.push(`of ${F(team,48)}${K.teamWord?' '+esc(K.teamWord):''}`);
-  if(fam.length) lines.push(`<div class="ln">${fam.join(' ')}</div>`);
-  const EV=v=>v?`<span class="fld wrap">${esc(v)}</span>`:F('',blank?95:70);
-  if(M) lines.push(`<div class="ln">in ${EV(evTxt)}. ${W.pro} won <b class="kc-medalword" style="color:${M.c}">${M.w}</b> medal</div>`);
-  else lines.push(`<div class="ln">for participating in ${EV(blank?'':evTxt)}</div>`);
-  lines.push(`<div class="ln">in <b class="kc-meet">${esc(m.name)}</b></div>`);
-  if(K.venue) lines.push(`<div class="ln">organized at <span class="fld wrap">${esc(K.venue)}</span>${when?'':'.'}</div>`);
-  if(when) lines.push(`<div class="ln">${K.venue?'':'organized '}${when}.</div>`);
-  // ── other body layouts ──
-  let bodyHtml=lines.join('');
-  if(K.layout==='form'){ // every row runs edge to edge: text + dotted fill lines (fully justified, like an official form)
-    const T=t=>`<span class="t">${t}</span>`, FF=(v,g,cls)=>`<span class="f${cls?' '+cls:''}" style="flex-grow:${g||1}">${v?esc(v):'&nbsp;'}</span>`;
-    const rows=[];
-    rows.push([T('This certificate is awarded to'),`<span class="f nmf" style="flex-grow:3">${blank?'':`<small>${W.hon}</small> ${esc(c.name||'')}`}</span>`]);
-    const r2=[]; if(blank||father) r2.push(T(`${blank?'Son/Daughter':W.rel} of`),FF(father,1)); if(blank||team) r2.push(T('of'),FF(team,1)); if((blank||team)&&K.teamWord) r2.push(T(esc(K.teamWord))); if(r2.length) rows.push(r2);
-    if(M) rows.push([T('in'),FF(evTxt,3),T(`${W.pro} won`),`<span class="f" style="flex-grow:.6;color:${M.c};text-transform:uppercase">${M.w}</span>`,T('medal')]);
-    else rows.push([T('for participating in'),FF(blank?'':evTxt,3)]);
-    rows.push([T('in'),FF(m.name,1,'meet')]);
-    if(K.venue||blank) rows.push([T('organized at'),FF(K.venue,1)]);
-    if(from||blank) rows.push([T('from'),FF(from,1),T('to'),FF(to||from,1)]);
-    else if(m.dates) rows.push([T('on'),FF(m.dates,1)]);
-    bodyHtml=rows.map(r=>`<div class="frow">${r.join('')}</div>`).join('');
-  } else if(K.layout==='para'){ // one justified paragraph (last line centred)
-    const who=`This certificate is awarded to ${blank?'Mr./Ms.':W.hon} ${F(blank?'':c.name,70)}`+(blank||father?` ${blank?'Son/Daughter':W.rel} of ${F(father,55)}`:'')+(blank||team?` of ${F(team,42)}${K.teamWord?' '+esc(K.teamWord):''}`:'');
-    const tail=`${K.venue?` organized at ${F(K.venue)}`:' organized'}${when?' '+when:''}.`;
-    bodyHtml=`<p class="para">${who} ${M?`in ${F(evTxt,70)}. ${W.pro} won <b class="kc-medalword" style="color:${M.c}">${M.w}</b> medal in <b>${esc(m.name)}</b>`:`for participating in ${F(blank?'':evTxt,80)} in <b>${esc(m.name)}</b>`}${tail}</p>`;
-  }
-  const perf=M&&c.result?`<div class="kc-perf">Performance: <b>${esc(resTxt(c.result))}</b>${c.mr?' · <b style="color:#c00">NEW MEET RECORD</b>':''}</div>`:'';
-  const photo=K.photo&&!blank&&a&&typeof photoOf==='function'?photoOf(a):null;
-  const qr=!blank&&K.qr?kcQr([K.brand||m.org, M?'Merit':'Participation', c.no?('No '+c.no):'', c.name, evTxt, M?M.w:''].filter(Boolean).join(' | ')):'';
-  const left=!blank&&K.photo?(photo?`<img class="kc-photo" src="${photo}" alt="">`:`<div class="kc-photo empty">PHOTO</div>`):'';
-  const right=!blank&&(qr||c.bib)?`${c.bib?`<div class="kc-bib"><small>ATHLETE NO.</small>${esc(c.bib)}</div>`:''}${qr?`<img class="kc-qr" src="${qr}" alt="">`:''}`:'';
-  const wide=!!(left||right);
-  const sigs=K.sigs.filter(x=>x&&(x.name||x.desig||x.img));
-  const ribbon=M?M.c:T.main;
-  return `<div class="page kscert" style="--kc:${T.main};--kcd:${T.dark};--kcs:${T.soft};--kcr:${ribbon}"><div class="kc">
-    <div class="kc-frame"></div><div class="kc-frame2"></div>
-    <div class="kc-corner tl">${KC_CORNER}</div><div class="kc-corner tr">${KC_CORNER}</div><div class="kc-corner bl">${KC_CORNER}</div><div class="kc-corner br">${KC_CORNER}</div>
-    ${m.logo&&K.wm?`<img class="kc-wm" src="${m.logo}" alt="">`:''}
-    <div class="kc-no"><span>Certi. No.:</span> <b>${c.no?esc(c.no):'<span class="fld blank" style="width:30mm">&nbsp;</span>'}</b></div>
-    <div class="kc-date"><span>Date:</span> ${blank?'<span class="fld blank" style="width:30mm">&nbsp;</span>':'<b>'+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'})+'</b>'}</div>
-    ${kcSeal(c.place)}
-    <div class="kc-head">${m.logo?`<img class="kc-logo" src="${m.logo}" alt="">`:''}
-      <div class="kc-org">${esc(m.org)}</div>${K.brand?`<div class="kc-brand">${esc(K.brand)}</div>`:''}${K.tagline?`<div class="kc-tag">${esc(K.tagline)}</div>`:''}</div>
-    <div class="kc-title">Certificate <span>of</span> ${M?'Merit':'Participation'}</div>
-    <div class="kc-flourish">${KC_FLOURISH}</div>
-    <div class="kc-ribbon"><span>${esc(m.name)}</span></div>
-    ${left?`<div class="kc-left">${left}</div>`:''}${right?`<div class="kc-right">${right}</div>`:''}
-    <div class="kc-body ly-${K.layout}${wide?' wide':''}">${bodyHtml}${perf}</div>
-    <div class="kc-sigs n${Math.max(1,sigs.length)}">${sigs.map(x=>`<div class="kc-sig"><div class="img">${x.img?`<img src="${x.img}" alt="">`:''}</div><b>${esc(x.name||'')}</b><span>${esc(x.desig||'')}</span>${x.org?`<em>${esc(x.org)}</em>`:''}</div>`).join('')}</div>
-  </div></div>`;
-}
-function KC_CSS(){ return `@page{size:A4 landscape;margin:0}
-.page.kscert{padding:0!important;width:297mm;height:209.5mm;max-width:none!important;overflow:hidden;position:relative;background:#fff}
-@media screen{.page.kscert{margin:0 auto 14px!important}}
-.kc{position:absolute;inset:0;font-family:Georgia,'Times New Roman',serif;color:#1d1d1d;background:radial-gradient(ellipse at 50% 45%,#fff 55%,var(--kcs) 100%)}
-.kc-frame{position:absolute;inset:7mm;border:2.2px solid var(--kc)}.kc-frame2{position:absolute;inset:9.5mm;border:.8px solid var(--kcd);opacity:.55}
-.kc-corner{position:absolute;width:30mm;height:30mm;color:var(--kc)}.kc-corner svg{width:100%;height:100%}
-.kc-corner.tl{top:4.5mm;left:4.5mm}.kc-corner.tr{top:4.5mm;right:4.5mm;transform:scaleX(-1)}.kc-corner.bl{bottom:4.5mm;left:4.5mm;transform:scaleY(-1)}.kc-corner.br{bottom:4.5mm;right:4.5mm;transform:scale(-1,-1)}
-.kc-wm{position:absolute;left:50%;top:60%;width:95mm;height:95mm;object-fit:contain;transform:translate(-50%,-50%);opacity:.045;filter:grayscale(1);mix-blend-mode:multiply}
-.kc-no,.kc-date{position:absolute;left:37mm;font:10pt Arial,sans-serif;color:#333;display:grid;grid-template-columns:20mm auto;align-items:end}
-.kc-no{top:14mm}.kc-date{top:20mm}.kc-no span,.kc-date span{color:#666}
-.kc-head{position:absolute;top:13mm;left:60mm;right:60mm;text-align:center}
-.kc-logo{height:19mm;max-width:60mm;object-fit:contain;display:block;margin:0 auto 1.5mm}
-.kc-org{font:700 12.5pt Arial,sans-serif;letter-spacing:3.5px;text-transform:uppercase;color:var(--kcd)}
-.kc-brand{font:900 21pt Arial,sans-serif;letter-spacing:5px;color:var(--kc);line-height:1.15}
-.kc-tag{font:9pt Arial,sans-serif;color:#555;margin-top:1mm}
-.kc-title{position:absolute;top:58mm;left:0;right:0;text-align:center;font-size:30pt;font-variant:small-caps;letter-spacing:4px;color:var(--kcd);line-height:1}
-.kc-title span{font-size:20pt;font-style:italic;font-variant:normal;letter-spacing:1px;color:var(--kc)}
-.kc-flourish{position:absolute;top:70mm;left:50%;width:70mm;transform:translateX(-50%);color:var(--kc)}.kc-flourish svg{width:100%;display:block}
-.kc-ribbon{position:absolute;top:77mm;left:50%;transform:translateX(-50%);min-width:150mm;max-width:225mm;text-align:center;background:var(--kcr);color:#fff;font:700 12.5pt Arial,sans-serif;letter-spacing:1px;padding:2.2mm 16mm;clip-path:polygon(0 0,100% 0,96% 50%,100% 100%,0 100%,4% 50%);white-space:nowrap}
-.kc-left,.kc-right{position:absolute;top:96mm;width:38mm;display:flex;flex-direction:column;align-items:center;gap:2mm}
-.kc-left{left:21mm}.kc-right{right:21mm;top:101mm}
-.kc-photo{width:31mm;height:38mm;object-fit:cover;border:1.4mm solid #fff;box-shadow:0 0 0 .5mm var(--kc);background:#f3f3f3}
-.kc-photo.empty{display:flex;align-items:center;justify-content:center;font:9pt Arial,sans-serif;color:#aaa;letter-spacing:2px}
-.kc-bib{font:700 12pt Arial,sans-serif;text-align:center;color:var(--kcd);line-height:1.15}.kc-bib small{display:block;font-size:6.5pt;letter-spacing:1.5px;color:#666}
-.kc-qr{width:21mm;height:21mm;image-rendering:pixelated}
-.kc-body{position:absolute;top:90mm;bottom:44mm;left:30mm;right:30mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;font-size:13.5pt;line-height:1.45;gap:1.3mm}
-.kc-body.wide{left:64mm;right:64mm}
-.kc-body .ln{max-width:100%}.kc-body .ln-lead{font-style:italic;color:#444;font-size:13pt}
-.kc-body .ln-name{margin:0 0 1.2mm}
-.kc-body .nm{display:inline-block;font:700 23pt Georgia,'Times New Roman',serif;color:var(--kcd);border-bottom:1.4px solid var(--kc);padding:0 6mm .6mm;min-width:100mm;line-height:1.2}
-.kc-body .nm .hon{font:400 14pt Georgia,'Times New Roman',serif;color:#444;margin-right:1.5mm}
-.kc-body .nm.blank{width:130mm;text-align:left}
-.kc-meet{white-space:nowrap;color:var(--kcd)}
-.fld{font-family:Arial,sans-serif;font-weight:700;font-size:13pt;color:#111;border-bottom:1.2px dotted #666;padding:0 1mm;white-space:nowrap}
-.fld.blank{display:inline-block;height:5.5mm;vertical-align:baseline}.fld.wrap{white-space:normal;-webkit-box-decoration-break:clone;box-decoration-break:clone}
-.kc-medalword{font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1px}
-.kc-body.ly-form{align-items:stretch;gap:3.2mm;font-size:13.5pt;line-height:1.3}
-.frow{display:flex;align-items:baseline;gap:2.2mm;width:100%}
-.frow .t{white-space:nowrap;color:#222}
-.frow .f{flex:1 1 0;min-width:16mm;border-bottom:1.2px dotted #555;text-align:center;font:700 13pt Arial,sans-serif;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 1mm .3mm}
-.frow .f.nmf{font:700 17pt Georgia,'Times New Roman',serif;color:var(--kcd);border-bottom:1.4px solid var(--kc)}
-.frow .f.nmf small{font:400 12pt Georgia,serif;color:#555;margin-right:1mm}.frow .f.meet{color:var(--kcd)}
-.kc-body.ly-para{display:block;padding-top:6mm}
-.kc-body p.para{margin:0;font-size:14pt;line-height:2.1;text-align:justify;text-align-last:center;hyphens:none}
-.kc-body p.para .fld{white-space:normal}
-.kc-perf{font:10.5pt Arial,sans-serif;color:#444;margin-top:1mm}
-.kc-seal{position:absolute;top:13mm;right:21mm;width:27mm}.kc-seal svg{width:100%;display:block}
-.kc-sigs{position:absolute;left:30mm;right:30mm;bottom:16mm;display:grid;gap:10mm;text-align:center;align-items:end}
-.kc-sigs.n1{grid-template-columns:70mm;justify-content:center}.kc-sigs.n2{grid-template-columns:70mm 70mm;justify-content:space-around}.kc-sigs.n3{grid-template-columns:repeat(3,1fr)}
-.kc-sig{display:flex;flex-direction:column;align-items:center;font-family:Arial,sans-serif;min-width:0}
-.kc-sig .img{height:13mm;display:flex;align-items:flex-end;justify-content:center}.kc-sig img{max-height:13mm;max-width:52mm;object-fit:contain;mix-blend-mode:multiply}
-.kc-sig b{font-size:11.5pt;color:var(--kcd);border-top:1px solid #444;padding-top:1mm;width:56mm;min-height:5mm}
-.kc-sig span{font-size:9.5pt;color:#333}.kc-sig em{font-size:9pt;font-style:normal;color:var(--kc)}`; }
-pcCert=function(c){ return kcCert(c); };
-pcBuild=(function(orig){ return function(o){
-  if(o&&o.kind==='certpreview'){ const pages=[kcCert({name:'Ravi Thakor',team:'Sanand',bib:'101',events:['U-14 Boys 100m Final'],place:1,result:'12.84',no:'SAMPLE-0001',gender:'Male',father:'Mahesh Thakor'}),
-      kcCert({name:'Meera Desai',team:'Bopal',bib:'214',events:['U-14 Girls Long Jump Final','U-14 Girls 200m Final'],no:'SAMPLE-0002',gender:'Female',father:'Kiran Desai'}),kcCert({blank:true,events:[]})];
-    return {pages,info:{medal:1,part:2,sheets:0,blank:1,skippedProv:0},title:'Certificate preview',css:KC_CSS(),land:true}; }
-  if(o&&o.kind==='custom'){ const d=o.custom||{}, s=getStore(); s.certSeq=(+s.certSeq||0)+1; const no=(meetInfo().name.replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase()||'KS')+String(new Date().getFullYear()).slice(2)+'-'+String(s.certSeq).padStart(4,'0'); saveStore(s);
-    return {pages:[kcCert(Object.assign({},d,{no}))],info:{medal:d.place?1:0,part:d.place?0:1,sheets:0,blank:0,skippedProv:0},title:'Certificate — '+(d.name||''),css:KC_CSS(),land:true}; }
-  const r=orig.apply(this,arguments); if(r&&r.land&&(r.pages||[]).some(x=>String(x).includes('kscert'))) r.css=KC_CSS(); return r; }; })(pcBuild);
-
-// ── settings card: Generate → 🎓 Certificate design ──
-function kcSigRow(i,x){ return `<div class="form-row col4" style="align-items:end;margin-bottom:6px">
-  <div class="form-group"><div class="form-label">Signature ${i+1} — name</div><input class="form-input" id="kc-sn${i}" value="${esc(x.name||'')}" placeholder="e.g. Rajesh Patel"></div>
-  <div class="form-group"><div class="form-label">Designation</div><input class="form-input" id="kc-sd${i}" value="${esc(x.desig||'')}" placeholder="e.g. President"></div>
-  <div class="form-group"><div class="form-label">Organisation (optional)</div><input class="form-input" id="kc-so${i}" value="${esc(x.org||'')}" placeholder="e.g. Vijayi Bharat Foundation"></div>
-  <div class="form-group"><div class="form-label">Signature image</div><div class="flex gap8 aic"><span id="kc-si${i}">${x.img?`<img src="${x.img}" style="height:34px;background:#fff;border-radius:4px">`:'<span style="color:#8b949e;font-size:12px">none</span>'}</span>
-    <label class="btn sm" style="position:relative;overflow:hidden">Upload<input type="file" accept="image/*" onchange="kcSigUpload(event,${i})" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>${x.img?`<button class="btn xs" onclick="kcSigClear(${i})">✕</button>`:''}</div></div></div>`; }
-function renderCertCard(){
-  let card=$('kc-card');
-  if(!card){ const mt=[...document.querySelectorAll('.card-title')].find(e=>/Meet details/.test(e.textContent)); if(!mt) return;
-    mt.closest('.card').insertAdjacentHTML('afterend','<div class="card" id="kc-card" style="grid-column:1/-1"></div>'); card=$('kc-card'); }
-  const K=certCfg(), m=meetInfo();
-  card.innerHTML=`<div class="card-hdr"><div class="card-title">🎓 Certificate design</div><div class="flex gap8"><button class="btn sm" onclick="pcGo(false,{kind:'certpreview'})">👁 Preview</button><button class="btn sm" onclick="openCustomCert()">✍ Custom certificate</button><button class="btn sm primary" onclick="openPrintCentre('allcert')">🖨 Print certificates</button></div></div>
-  <div class="card-body">
-    <div style="font-size:12px;color:#8b949e;margin-bottom:10px">Logo, meet name and organisation come from <b>Meet details</b> above (Organised by = top line). Fill these, press <b>Save</b>, then <b>Preview</b>.</div>
-    <div class="form-row col3">
-      <div class="form-group"><div class="form-label">Programme name (big line)</div><input class="form-input" id="kc-brand" value="${esc(K.brand)}" placeholder="KHELE SANAND"></div>
-      <div class="form-group"><div class="form-label">Tagline / affiliation (optional)</div><input class="form-input" id="kc-tag" value="${esc(K.tagline)}" placeholder="In association with …"></div>
-      <div class="form-group"><div class="form-label">Word after team name</div><input class="form-input" id="kc-tw" value="${esc(K.teamWord)}" placeholder="village team"></div>
-    </div>
-    <div class="form-row col1"><div class="form-group"><div class="form-label">Venue — “organized at …” (where the meet was held)</div><input class="form-input" id="kc-venue" value="${esc(K.venue)}" placeholder="e.g. Taluka Sports Complex, Sanand, Gujarat"></div></div>
-    <div class="form-row col4">
-      <div class="form-group"><div class="form-label">Meet from (date)</div><input class="form-input" type="date" id="kc-from" value="${esc(K.from)}"></div>
-      <div class="form-group"><div class="form-label">Meet to (date)</div><input class="form-input" type="date" id="kc-to" value="${esc(K.to)}"></div>
-      <div class="form-group"><div class="form-label">Text layout</div><select class="form-select" id="kc-layout"><option value="form"${K.layout==='form'?' selected':''}>A — Form lines (justified)</option><option value="para"${K.layout==='para'?' selected':''}>B — Paragraph (justified)</option><option value="lines"${K.layout==='lines'?' selected':''}>C — Centred lines</option></select></div>
-      <div class="form-group"><div class="form-label">Colour theme</div><select class="form-select" id="kc-theme">${Object.entries(KC_THEMES).map(([k,t])=>`<option value="${k}"${k===K.theme?' selected':''}>${t.name}</option>`).join('')}</select></div>
-      <div class="form-group"><div class="form-label">Show on certificate</div><div style="display:flex;gap:14px;font-size:13px;padding-top:6px"><label><input type="checkbox" id="kc-photo"${K.photo?' checked':''}> Athlete photo</label><label><input type="checkbox" id="kc-qr"${K.qr?' checked':''}> QR code</label><label><input type="checkbox" id="kc-wm"${K.wm?' checked':''}> Logo watermark</label></div></div>
-    </div>
-    <div id="kc-sigs">${[0,1,2].map(i=>kcSigRow(i,K.sigs[i]||{})).join('')}</div>
-    <div style="font-size:12px;color:#8b949e;margin:4px 0 10px">Signature image: sign on white paper, take a photo, crop tight. Leave a row empty to show only 2 signatures. Father name comes from the <b>Father name</b> column in Bulk Add Athletes (Excel).</div>
-    <button class="btn primary" onclick="saveCertCfg()">Save certificate design</button>
-  </div>`;
-}
-function kcReadSigs(){ const K=certCfg(); return [0,1,2].map(i=>({name:($('kc-sn'+i)||{}).value?.trim()||'',desig:($('kc-sd'+i)||{}).value?.trim()||'',org:($('kc-so'+i)||{}).value?.trim()||'',img:(K.sigs[i]||{}).img||''})); }
-function saveCertCfg(silent){ const s=getStore(), old=s.settings.cert||{}, g=id=>($(id)||{}).value;
-  s.settings.cert=Object.assign({},old,{venue:(g('kc-venue')||'').trim(),brand:(g('kc-brand')||'').trim(),tagline:(g('kc-tag')||'').trim(),teamWord:(g('kc-tw')||'').trim(),from:g('kc-from')||'',to:g('kc-to')||'',theme:g('kc-theme')||'saffron',layout:g('kc-layout')||'form',photo:!!($('kc-photo')||{}).checked,qr:!!($('kc-qr')||{}).checked,wm:!!($('kc-wm')||{}).checked,sigs:kcReadSigs()});
-  if(s.settings.cert.from&&s.settings.cert.to&&s.settings.cert.to<s.settings.cert.from){ toast('“Meet to” date is before “Meet from”','error'); return; }
-  saveStore(s); if(!silent) toast('Certificate design saved','success'); }
-function kcSigUpload(e,i){ const f=e.target.files[0]; e.target.value=''; if(!f) return;
-  compressImage(f,520,0.9).then(d=>{ saveCertCfg(true); const s=getStore(); const c=s.settings.cert=s.settings.cert||{}; c.sigs=c.sigs&&c.sigs.length?c.sigs:kcReadSigs(); while(c.sigs.length<3) c.sigs.push({name:'',desig:'',org:'',img:''}); c.sigs[i].img=d; saveStore(s); renderCertCard(); toast('Signature saved','success'); }); }
-function kcSigClear(i){ saveCertCfg(true); const s=getStore(), c=s.settings.cert; if(c&&c.sigs&&c.sigs[i]) c.sigs[i].img=''; saveStore(s); renderCertCard(); }
-renderMeetCard=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ renderCertCard(); }catch(e){ console.warn(e); } return r; }; })(renderMeetCard);
-setTimeout(()=>{ try{ renderCertCard(); }catch{} },900);
-
-// ── custom certificate (any sport / any person, e.g. Kabaddi) ──
-function openCustomCert(){
-  let m=$('kcCustom'); if(!m){ m=document.createElement('div'); m.id='kcCustom'; m.className='modal-overlay'; document.body.appendChild(m); }
-  const s=getStore(); const evOpts=[...new Set(s.events.map(e=>kcEvent(e.name)))].map(n=>`<option value="${esc(n)}">`).join('');
-  m.innerHTML=`<div class="modal" style="width:min(640px,95vw)"><div class="modal-hdr"><div class="modal-title">✍ Custom certificate</div><button class="modal-close" onclick="closeModal('kcCustom')">✕</button></div>
-  <div class="modal-body"><div style="font-size:12px;color:#8b949e;margin-bottom:10px">For any event or sport (e.g. <b>Under-14 Kabaddi (Boys)</b>). Design, logo and signatures come from Certificate design.</div>
-    <div class="form-row col2"><div class="form-group"><div class="form-label">Name *</div><input class="form-input" id="cc-name"></div>
-      <div class="form-group"><div class="form-label">Gender</div><select class="form-select" id="cc-g"><option value="Male">Male (Mr. / Son / He)</option><option value="Female">Female (Ms. / Daughter / She)</option><option value="">Not set (Mr./Ms.)</option></select></div></div>
-    <div class="form-row col2"><div class="form-group"><div class="form-label">Father's name</div><input class="form-input" id="cc-father"></div>
-      <div class="form-group"><div class="form-label">Village / team</div><input class="form-input" id="cc-team" list="dl-cc-team"><datalist id="dl-cc-team">${(s.teams||[]).map(t=>`<option value="${esc(t)}">`).join('')}</datalist></div></div>
-    <div class="form-row col2"><div class="form-group"><div class="form-label">Event *</div><input class="form-input" id="cc-ev" list="dl-cc-ev" placeholder="Under-14 Kabaddi (Boys)"><datalist id="dl-cc-ev">${evOpts}</datalist></div>
-      <div class="form-group"><div class="form-label">Certificate type</div><select class="form-select" id="cc-place"><option value="0">Participation</option><option value="1">Merit — Gold</option><option value="2">Merit — Silver</option><option value="3">Merit — Bronze</option></select></div></div>
-    <div class="form-row col2"><div class="form-group"><div class="form-label">Chest / bib no. (optional)</div><input class="form-input" id="cc-bib"></div>
-      <div class="form-group"><div class="form-label">Performance (optional)</div><input class="form-input" id="cc-res" placeholder="e.g. 12.84 or 4.65m"></div></div>
-    <div class="form-actions"><button class="btn primary" onclick="printCustomCert()">🖨 Make certificate</button></div></div></div>`;
-  m.classList.add('open'); setTimeout(()=>$('cc-name')?.focus(),50);
-}
-function printCustomCert(){ const g=id=>($(id).value||'').trim(), name=g('cc-name'), ev=g('cc-ev');
-  if(!name||!ev){ toast('Name and event are needed','error'); return; }
-  const place=+g('cc-place')||0, bib=g('cc-bib'), s=getStore(), a=bib?s.athletes.find(x=>String(x.bib)===bib):null;
-  closeModal('kcCustom');
-  pcGo(false,{kind:'custom',custom:{name,gender:$('cc-g').value,father:g('cc-father'),team:g('cc-team'),events:[ev],place:place||undefined,bib,result:g('cc-res'),ath:a||{name,bib}}}); }
-
-// ── father name: Bulk Add Athletes column (Excel / CSV / grid) ──
-ATH_FIELDS.push({k:'father',label:'Father name',w:140,al:['father','fathername','fathersname','sonof','daughterof','sdo','swo','parent','parentname','guardian','guardianname']});
-bulkImport=(function(orig){ return function(){
-  const want=_bulk.kind==='athletes'?(_bulk.preview||[]).filter(r=>['ok','warn','upd'].includes(r.status)&&r.data&&String(r.data.father||'').trim()).map(r=>r.data):[];
-  const r=orig.apply(this,arguments);
-  if(want.length){ const s=getStore(); want.forEach(d=>{ s.athletes.filter(x=>x.name===String(d.name).trim()&&x.team.toLowerCase()===String(d.team).trim().toLowerCase()&&(!d.event||x.event===d.event)).forEach(x=>x.father=String(d.father).trim()); }); saveStore(s); }
-  return r; }; })(bulkImport);
-downloadBulkTemplate=(function(orig){ return function(kind){ if(kind!=='athletes') return orig.apply(this,arguments);
-  downloadFile('athletes-template.csv','﻿Name,Father name,Team,Event,Bib,Lane,DOB,Gender,Village/School,PB,Aadhaar last 4,Photo link\nRavi Thakor,Mahesh Thakor,Sanand,U-17 Boys 200m Final,,,12/04/2010,M,Sanand,24.10,1234,https://drive.google.com/file/d/FILE_ID/view?usp=sharing\nMeera Desai,Kiran Desai,Ahmedabad,U-17 Girls 200m Final,210,4,03/09/2010,F,Bopal,,5678,\n','text/csv'); }; })(downloadBulkTemplate);
-
-// father names stay on the control laptop (not sent to screens / phones)
-stateForPush=(function(orig){ return function(s){ const c=orig.apply(this,arguments); (c.athletes||[]).forEach(a=>{ delete a.father; }); return c; }; })(stateForPush);
-
-// ═══════════════════════════════════════════════════
-// MULTI-LIVE — several events live at the same time (e.g. a race + Long Jump + Shot Put).
-// The main live event keeps the timer; "also live" events rotate with it on LED Dashboard and Big View.
-// Control room: Run of Show → "📺 Live on screens": add / remove, pin one event, or auto-rotate.
-// Every screen picks the same event at the same moment (clock-based), so all LEDs stay in step.
-// ═══════════════════════════════════════════════════
-function liveList(s){ s=s||getStore(); const seen=new Set();
-  return [s.liveEventId,...(s.alsoLive||[])].filter(Boolean).map(id=>eventById(s,id)).filter(e=>e&&e.status!=='completed'&&!seen.has(e.id)&&seen.add(e.id)); }
-const KC_FINAL_HOLD=180000; // a just-finished "also live" event stays on screens 3 min with its final results
-function screenList(s){ s=s||getStore(); const L=liveList(s), now=Date.now();
-  const done=(s.alsoLive||[]).map(id=>eventById(s,id)).filter(e=>e&&e.status==='completed'&&e.finalAt&&now-Number(e.finalAt)<KC_FINAL_HOLD&&!L.some(x=>x.id===e.id));
-  return [...L,...done]; }
-function liveRotateSec(s){ s=s||getStore(); return Math.max(4,+s.liveRotate||+getDisplay().rotate||10); }
-function screenEventId(s){ s=s||getStore(); const L=screenList(s); if(!L.length) return s.liveEventId||null;
-  if(s.screenFocus&&L.some(e=>e.id===s.screenFocus)) return s.screenFocus;
-  if(L.length===1) return L[0].id;
-  return L[Math.floor(syncNow()/(liveRotateSec(s)*1000))%L.length].id; }
-// Big View: live events as a SPLIT screen (2–4 columns at once) or a SLIDESHOW (one live slide each)
-function liveViewMode(s){ s=s||getStore(); return s.liveView==='rotate'?'rotate':'split'; }
-function splitLiveSlide(s,L){
-  const list=L.slice(0,4), n=list.length, rowsMax=n>=4?5:8;
-  const cols=list.map(ev=>{ const main=ev.id===s.liveEventId;
-    const res=[...(s.results[ev.name]||[])].sort((a,b)=>a.rank-b.rank).slice(0,rowsMax);
-    const start=res.length?[]:s.athletes.filter(a=>a.event===ev.name).sort((a,b)=>(a.lane||99)-(b.lane||99)).slice(0,rowsMax);
-    const rows=res.length?res.map(resRowHtml).join(''):start.map(a=>`<div class="fv-res lane"><div class="p">${esc(a.lane||'—')}</div><div><div class="n">${esc(a.name)}</div><div class="t">${esc(a.team)}</div></div><div class="r">#${esc(a.bib||'—')}</div><div class="f"></div></div>`).join('');
-    const pm=resMeta(s,ev.name), prov=pm&&pm.provisional&&res.length;
-    const fin=ev.status==='completed';
-    return `<div class="fs-col"><div class="fv-kicker">${fin?'✓ FINAL RESULTS':(main?'● LIVE NOW':'● ALSO LIVE')+(res.length?(prov?' · PROVISIONAL':' · RESULTS'):' · START LIST')}</div>
-      <div class="fv-title">${esc(ev.name)}</div><div class="fv-meta">${esc([ev.venue,ev.category].filter(Boolean).join(' · '))}</div>
-      ${main&&!fin?`<div class="fv-timer"><span id="fv-timer">${fmtElapsed(elapsedMs())}</span></div>`:''}
-      ${rows?`<div class="fv-table" style="grid-template-rows:repeat(${Math.max(rowsMax,(rows.match(/fv-res/g)||[]).length)},1fr)">${rows}</div>`:'<div class="fv-empty" style="font-size:2vw">Athletes on their marks…</div>'}</div>`; });
-  return {key:'live',html:`<div class="fs-grid n${n}">${cols.join('')}</div>`};
-}
-buildFocusSlides=(function(orig){ return function(s){
-  const L=screenList(s); if(!L.length||(L.length===1&&L[0].id===s.liveEventId)) return orig.apply(this,arguments);
-  const base=orig(s), rest=(s.liveOnly&&L.length>1)?[]:base.filter(x=>x.key!=='live');
-  const one=ev=>{ const sl=orig(Object.assign({},s,{liveEventId:ev.id})).find(x=>x.key==='live'); if(!sl) return null;
-    let html=sl.html;
-    if(ev.id!==s.liveEventId) html=html.replace(/<div class="fv-timer">[\s\S]*?<\/span><\/div>/,ev.status==='completed'?'':`<div class="fv-timer"><small>ALSO LIVE</small><span>${esc(String(ev.type||'live').toUpperCase())}</span></div>`);
-    if(ev.status==='completed') html=html.replace(/● LIVE NOW|LATEST RESULTS/,'✓ FINAL RESULTS');
-    return {key:ev.id===s.liveEventId?'live':'live:'+ev.id,html}; };
-  if(L.length===1){ const sl=one(L[0]); return sl?[sl,...rest]:base; }
-  if(s.screenFocus){ const pe=L.find(e=>e.id===s.screenFocus); if(pe){ const sl=one(pe); if(sl) return [sl]; } }
-  if(liveViewMode(s)==='split') return [splitLiveSlide(s,L),...rest];
-  return [...L.map(one).filter(Boolean),...rest]; }; })(buildFocusSlides);
-(function(){ const css=document.createElement('style'); css.textContent=`
-.fs-grid{flex:1;display:grid;gap:1.6vw;height:100%;min-height:0}.fs-grid.n2{grid-template-columns:1fr 1fr}.fs-grid.n3{grid-template-columns:repeat(3,1fr)}.fs-grid.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
-.fs-col{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:.35vw solid var(--orange);padding-left:1vw}
-.fs-grid .fv-kicker{font-size:clamp(11px,1.15vw,26px)}.fs-grid .fv-meta{font-size:clamp(11px,1.1vw,24px);margin-bottom:.8vh}
-.fs-grid .fv-title{font-size:clamp(18px,min(2.7vw,5vh),64px);-webkit-line-clamp:2}
-.fs-grid .fv-timer{font-size:clamp(24px,min(3.8vw,7vh),96px);text-align:left;margin:.2vh 0 1vh}
-.fs-grid .fv-table{gap:.6vh}.fs-grid .fv-res{grid-template-columns:3.6vw 1fr 8.5vw 3.2vw;gap:.8vw;padding:0 .8vw}
-.fs-grid .fv-res .p{font-size:clamp(16px,2.1vw,50px)}.fs-grid .fv-res .n{font-size:clamp(14px,1.65vw,42px)}.fs-grid .fv-res .t{font-size:clamp(10px,.9vw,20px)}
-.fs-grid .fv-res .r{font-size:clamp(16px,2vw,48px)}.fs-grid .fv-res .f{font-size:clamp(9px,.8vw,18px);padding:.2vh .2vw}
-.fs-grid.n3 .fv-title{font-size:clamp(16px,min(2vw,4.4vh),50px)}.fs-grid.n3 .fv-res{grid-template-columns:2.6vw 1fr 6.4vw 2.4vw;gap:.5vw;padding:0 .5vw}
-.fs-grid.n3 .fv-res .p{font-size:clamp(14px,1.6vw,40px)}.fs-grid.n3 .fv-res .n{font-size:clamp(12px,1.25vw,32px)}.fs-grid.n3 .fv-res .r{font-size:clamp(14px,1.5vw,36px)}.fs-grid.n3 .fv-res .t{font-size:clamp(9px,.75vw,18px)}
-.fs-grid.n4 .fv-title{font-size:clamp(14px,min(2vw,3.4vh),44px);-webkit-line-clamp:1}.fs-grid.n4 .fv-timer{font-size:clamp(20px,min(2.6vw,4.6vh),64px);margin:0}`;
-  document.head.appendChild(css); })();
-// LED Dashboard: hero + live results follow the event on screen
-function ledAltLive(){
-  const s=getStore(), id=screenEventId(s), scr=$('led-screen'); if(!scr) return;
-  const L=screenList(s); const alt=!!(id&&id!==s.liveEventId&&L.some(e=>e.id===id)); scr.classList.toggle('alt-live',alt);
-  setText('d-multi-live',L.length>1?`📺 ${L.findIndex(e=>e.id===id)+1} / ${L.length} LIVE`:'');
-  if(!alt) return; const ev=eventById(s,id); if(!ev) return;
-  setText('d-hero-name',ev.name); setText('d-hero-meta',[ev.venue,ev.category,ev.heat,ev.status==='completed'?'FINAL RESULTS':'ALSO LIVE'].filter(Boolean).join('  ·  ')); setText('d-start-time',ev.time||'--:--');
-  const badge=$('d-status-badge'); if(badge){ const b=statusBadge(ev.status); badge.className='status-badge '+b.cls; badge.textContent=b.txt; }
-  const rows=[...(s.results[ev.name]||[])].sort((a,b)=>a.rank-b.rank), rc=$('d-results');
-  if(rc) rc.innerHTML=rows.length?rows.map(r=>{ const cls=r.rank===1?'r1':r.rank===2?'r2':r.rank===3?'r3':'rn';
-      return `<div class="res-row"><div class="rk ${cls}">${rankLabel(r)}</div><div><div class="at-name">${esc(r.name)}</div><div class="at-sub">${esc(r.team)} · #${esc(r.bib||r.lane||'—')}</div></div>
-        <div><div class="res-time${r.rank===1?' best':''}">${esc(resTxt(r.result)||'—')}</div><div style="text-align:right;margin-top:1px">${flagBadge(r)}</div></div>
-        <div style="text-align:center;font-size:20px">${r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':''}</div></div>`; }).join('')
-    : `<div style="padding:20px;text-align:center;color:var(--muted);font-family:'Teko',sans-serif;font-size:16px;letter-spacing:2px">Awaiting results...</div>`;
-  setText('d-res-count',rows.length+' Athletes');
-}
-renderDashboard=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ ledAltLive(); }catch(e){ console.warn(e); } return r; }; })(renderDashboard);
-(function(){ const css=document.createElement('style');
-  css.textContent='#led-screen.alt-live div:has(> #d-elapsed){visibility:hidden}#d-multi-live{display:inline-block;margin-left:8px;font-family:Teko,sans-serif;font-size:13px;letter-spacing:2px;color:var(--gold)}';
+(function(){
+  const css=document.createElement('style'); css.textContent=`
+  #admin-screen .admin-topbar{display:flex;align-items:center;gap:14px;padding:8px 14px!important;min-height:58px;height:auto!important}
+  #admin-screen .admin-brand{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto}
+  #admin-screen .admin-brand .admin-brand-name{white-space:nowrap}
+  #admin-screen .admin-tag{display:inline-block!important;font-size:10px!important;letter-spacing:2px;padding:3px 8px!important;border-radius:999px}
+  #admin-screen .tb-back{width:34px;height:34px;padding:0!important;border-radius:50%!important;font-size:16px!important;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  #admin-screen .admin-actions{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:nowrap!important;min-width:0}
+  #admin-screen .tb-status{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 4px;border-radius:999px;border:1px solid rgba(127,127,127,.25);background:rgba(127,127,127,.06);flex:0 0 auto}
+  #admin-screen .tb-status .sync-pill{margin:0!important}
+  #admin-screen .tb-status .admin-clock{font-size:14px!important;padding:0 4px;white-space:nowrap}
+  #admin-screen .tb-group{display:flex;align-items:center;gap:4px;padding:4px;border-radius:999px;border:1px solid rgba(127,127,127,.22);background:rgba(127,127,127,.06);flex:0 0 auto}
+  #admin-screen .tb-btn{display:inline-flex!important;align-items:center;gap:6px;height:36px;padding:0 14px!important;border-radius:999px!important;white-space:nowrap;font-size:13px!important}
+  #admin-screen .tb-btn .tb-ic{font-size:15px;line-height:1}
+  #admin-screen .tb-group .btn:not(.warning):not(.primary):not(.danger):not(.wa):not(.on){background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+  #admin-screen .tb-group .btn:not(.warning):not(.primary):not(.danger):not(.wa):not(.on):hover{background:rgba(127,127,127,.12)!important}
+  #admin-screen .tb-group .vc-on-btn.on{background:#1f883d!important;border-color:#1a7f37!important;color:#fff!important}
+  #admin-screen .tb-group .vc-stop-btn[style*="none"]{display:none!important}
+  #admin-screen .tb-sep{width:1px;height:22px;background:rgba(127,127,127,.3);margin:0 2px}
+  #tb-menu{position:fixed;z-index:20003;width:290px;padding:8px;border-radius:20px;display:none;color:#1f2328;
+    background:radial-gradient(140% 70% at 18% -10%,rgba(255,255,255,.95),transparent 55%),linear-gradient(135deg,rgba(255,255,255,.8),rgba(255,255,255,.6));
+    -webkit-backdrop-filter:blur(28px) saturate(190%);backdrop-filter:blur(28px) saturate(190%);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1.5px 1px #fff,0 20px 50px rgba(30,41,80,.25)}
+  #tb-menu.open{display:block;animation:gpIn .16s ease-out}
+  #tb-menu .tb-sec{font:700 10px 'Barlow',sans-serif;letter-spacing:2px;text-transform:uppercase;color:#6e7781;padding:8px 10px 4px}
+  #tb-menu .tb-mi{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:12px;cursor:pointer;color:inherit;font:600 14px 'Barlow',sans-serif}
+  #tb-menu .tb-mi:hover{background:rgba(10,111,224,.09)}
+  #tb-menu .tb-mi.danger{color:#cf222e}
+  #tb-menu .mi-ic{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(127,127,127,.1);font-size:16px;flex:0 0 auto}
+  #tb-menu .mi-t{display:flex;flex-direction:column;gap:1px}#tb-menu .mi-t small{font:400 11px 'Barlow',sans-serif;color:#6e7781}
+  body:not(.ops-light) #tb-menu{color:#e6edf3;background:linear-gradient(135deg,rgba(40,46,58,.92),rgba(16,20,28,.88));border-color:rgba(255,255,255,.14);box-shadow:inset 0 1px 1px rgba(255,255,255,.12),0 20px 50px rgba(0,0,0,.5)}
+  body:not(.ops-light) #tb-menu .mi-t small,body:not(.ops-light) #tb-menu .tb-sec{color:#9aa4ae}
+  @media (max-width:1320px){ #admin-screen .tb-group .tb-btn:not(.warning):not(.primary) .tb-tx{display:none} #admin-screen .tb-group .tb-btn:not(.warning):not(.primary){padding:0 11px!important} }
+  @media (max-width:1060px){ #admin-screen .admin-tag{display:none!important} #admin-screen .tb-btn.primary .tb-tx{display:none} }
+  @media (max-width:860px){
+    #admin-screen .admin-topbar{flex-direction:row!important;flex-wrap:wrap;align-items:center!important;gap:8px;padding:8px 10px!important}
+    #admin-screen .admin-brand{flex:1 1 auto}
+    #admin-screen .admin-actions{display:contents!important}
+    #admin-screen .tb-status{order:2;margin-left:auto}
+    #admin-screen .tb-group{order:3;width:100%;justify-content:space-between;overflow-x:auto}
+    #admin-screen .tb-group .tb-btn .tb-tx{display:none}
+    #admin-screen .tb-group .tb-btn{flex:1 1 0;justify-content:center;padding:0 6px!important}
+    #admin-screen .tb-sep{display:none}
+    #admin-screen .admin-brand-name{font-size:17px!important}
+    #admin-screen .tb-status .admin-clock{display:none}
+    #admin-screen .admin-brand{flex:0 1 auto;min-width:0}
+  }`;
   document.head.appendChild(css);
-  const meta=$('d-hero-meta'); if(meta&&!$('d-multi-live')) meta.insertAdjacentHTML('afterend','<span id="d-multi-live"></span>'); })();
-let _scrLast=null;
-let _scrSig='';
-setInterval(()=>{ const s=getStore(), L=screenList(s); const sig=L.map(e=>e.id+e.status).join(',')+'|'+(s.screenFocus||0);
-  const id=L.length?screenEventId(s):null; if(id===_scrLast&&sig===_scrSig) return; const listChanged=sig!==_scrSig; _scrLast=id; _scrSig=sig;
-  if(isActive('led-screen')) renderDashboard(); if(listChanged&&isActive('focus-screen')) renderFocus(null); },1000);
-// keep "also live" events live when the main live event changes
-setLiveEvent=(function(orig){ return function(id){
-  const keep=(getStore().alsoLive||[]).filter(x=>x!==Number(id)); const r=orig.apply(this,arguments); const s=getStore();
-  s.alsoLive=keep.filter(x=>{ const e=eventById(s,x); return e&&e.id!==s.liveEventId&&(e.status!=='completed'||(e.finalAt&&Date.now()-Number(e.finalAt)<KC_FINAL_HOLD)); });
-  s.alsoLive.forEach(x=>{ const e=eventById(s,x); if(e&&e.status!=='completed') e.status='live'; });
-  if(s.screenFocus&&!liveList(s).some(e=>e.id===s.screenFocus)) s.screenFocus=0;
-  saveStore(s); return r; }; })(setLiveEvent);
-// control-room actions
-function addAlsoLive(id){ id=Number(id); const s=getStore(), ev=eventById(s,id); if(!ev){ toast('Choose an event','error'); return; }
-  if(id===s.liveEventId||(s.alsoLive||[]).includes(id)){ toast(`"${ev.name}" is already live`,'info'); return; }
-  if(!s.liveEventId){ setLiveEvent(id); toast(`"${ev.name}" is now LIVE`,'success'); renderRunOfShow(); return; }
-  s.alsoLive=[...(s.alsoLive||[]).filter(x=>{ const e=eventById(s,x); return e&&(e.status!=='completed'||(e.finalAt&&Date.now()-Number(e.finalAt)<KC_FINAL_HOLD)); }),id]; ev.status='live'; saveStore(s); toast(`"${ev.name}" is also LIVE — screens rotate`,'success'); renderRunOfShow(); }
-function removeAlsoLive(id,finish){ id=Number(id); const s=getStore(), ev=eventById(s,id); if(!ev) return;
-  if(finish&&!confirm(`Mark "${ev.name}" as FINISHED?`)) return;
-  if(!finish) s.alsoLive=(s.alsoLive||[]).filter(x=>x!==id); /* a finished event stays listed so screens show its final results for 3 min */
-  if(s.screenFocus===id) s.screenFocus=0;
-  ev.status=finish?'completed':'upcoming'; if(finish) ev.finalAt=Date.now();
-  saveStore(s); toast(finish?`"${ev.name}" finished`:`"${ev.name}" removed from live`,'success'); renderRunOfShow(); }
-function pinScreen(id){ const s=getStore(); s.screenFocus=Number(id)||0; if(s.screenFocus&&!screenList(s).some(e=>e.id===s.screenFocus)){ toast('That event is not live','error'); return; } saveStore(s); _scrLast=null; if(typeof refreshFocusInPlace==='function') renderFocus(true);
-  toast(s.screenFocus?`Screens now show only "${(eventById(s,s.screenFocus)||{}).name}"`:'Screens rotate between live events','success'); renderRunOfShow(); }
-function setLiveView(m){ const s=getStore(); s.liveView=m==='rotate'?'rotate':'split'; saveStore(s); if(isActive('focus-screen')) renderFocus(true); toast(m==='rotate'?'Big View: one live event at a time (slideshow)':'Big View: all live events side by side (split screen)','success'); renderRunOfShow(); }
-function setLiveOnly(on){ const s=getStore(); s.liveOnly=!!on; saveStore(s); if(isActive('focus-screen')) renderFocus(true); toast(on?'Big View shows only live events':'Big View also shows Next events, medals…','success'); }
-function setLiveRotate(v){ const s=getStore(); s.liveRotate=Math.max(4,Math.min(120,parseInt(v)||10)); saveStore(s); toast(`Live events switch every ${s.liveRotate} s`,'success'); }
-function multiLiveCard(){
-  const s=getStore(), L=liveList(s), main=s.liveEventId, pin=s.screenFocus&&L.some(e=>e.id===s.screenFocus)?s.screenFocus:0;
-  const cand=sortedEvents(s).filter(e=>e.status!=='completed'&&e.type!=='ceremony'&&!L.some(x=>x.id===e.id)&&isTodayEv(e));
-  const rows=L.map(ev=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border,#30363d);flex-wrap:wrap">
-      <span style="font-size:11px;padding:2px 7px;border-radius:5px;background:${ev.id===main?'#238636':'#1f6feb'};color:#fff">${ev.id===main?'⏱ MAIN':'ALSO LIVE'}</span>
-      <b style="flex:1;min-width:160px">${esc(ev.name)}</b><span style="font-size:12px;color:#8b949e">${esc(ev.venue||'')}</span>
-      ${L.length>1?`<button class="btn xs${pin===ev.id?' primary':''}" onclick="pinScreen(${pin===ev.id?0:ev.id})">${pin===ev.id?'📌 On screen — tap for Auto':'📌 Only this'}</button>`:''}
-      ${ev.id!==main?`<button class="btn xs" onclick="removeAlsoLive(${ev.id},true)">✓ Finish</button><button class="btn xs" onclick="removeAlsoLive(${ev.id},false)">✕ Not live</button>`:''}</div>`).join('');
-  return `<div class="card" id="ml-card" style="margin-bottom:14px"><div class="card-hdr"><div class="card-title">📺 Live on screens ${L.length?`(${L.length})`:''}</div>
-    <div class="flex gap8 aic" style="font-size:12px">${L.length>1?(pin?`<button class="btn sm primary" onclick="pinScreen(0)">▶ Auto rotate</button>`:`<span style="color:var(--green)">● Auto rotating</span>`):''}
-      ${L.length>1?`<span style="display:inline-flex;border:1px solid var(--border,#30363d);border-radius:8px;overflow:hidden"><button class="btn xs${liveViewMode(s)==='split'?' primary':''}" style="border-radius:0" onclick="setLiveView('split')">⊞ Split screen</button><button class="btn xs${liveViewMode(s)==='rotate'?' primary':''}" style="border-radius:0" onclick="setLiveView('rotate')">🔁 Slideshow</button></span>
-      <label style="display:inline-flex;gap:4px;align-items:center;color:#c9d1d9"><input type="checkbox"${s.liveOnly?' checked':''} onchange="setLiveOnly(this.checked)"> only live events</label>`:''}
-      <span style="color:#8b949e">switch every</span><input class="form-input" type="number" min="4" max="120" value="${liveRotateSec(s)}" style="width:64px;padding:4px 6px" onchange="setLiveRotate(this.value)"><span style="color:#8b949e">s</span></div></div>
-    <div class="card-body">${rows||'<div style="color:#8b949e;font-size:13px">No live event yet.</div>'}
-      <div class="flex gap8 aic" style="margin-top:10px;flex-wrap:wrap"><select class="form-select" id="ml-add" style="flex:1;min-width:220px">${cand.map(e=>`<option value="${e.id}">${esc(e.time||'--:--')} · ${esc(e.name)}</option>`).join('')||'<option value="">No other events today</option>'}</select>
-        <button class="btn sm primary" onclick="addAlsoLive($('ml-add').value)">➕ Also live</button></div>
-      <div style="font-size:12px;color:#8b949e;margin-top:6px">Run a race and field events together. ⏱ MAIN uses the big timer; every ALSO LIVE event has its own ▶ Start timer. <b>Big View / LED wall</b>: ⊞ Split screen shows up to 4 live events side by side, 🔁 Slideshow shows them one after another. <b>LED Dashboard</b> switches its main panel between them. 📌 keeps one event on every screen.</div></div></div>`;
-}
-renderRunOfShow=(function(orig){ return function(){ const r=orig.apply(this,arguments); const host=$('ros-body'); if(host&&!host.querySelector('#ml-card')) host.insertAdjacentHTML('afterbegin',multiLiveCard()); return r; }; })(renderRunOfShow);
-
-// Public phone page: every live event gets its own card (also-live events come with status LIVE in the feed)
-renderPublic=(function(orig){ return function(){ const r=orig.apply(this,arguments);
-  try{ if(_pubTab!=='live') return r; const s=getStore(); const extra=s.events.filter(e=>e.status==='live'&&e.id!==s.liveEventId); if(!extra.length) return r;
-    const html=extra.map(ev=>`<div class="pb-card pb-live"><div class="pb-kick">● ALSO LIVE</div><div class="pb-title">${esc(ev.name)}</div><div class="pb-meta">${esc([ev.venue,ev.category,ev.heat].filter(Boolean).join(' · '))}</div></div><div class="pb-card">${pubResultsHtml(s,ev,10)}</div>`).join('');
-    const scr=$('public-screen'), main=scr&&scr.querySelector('.pb-live');
-    if(main&&main.nextElementSibling) main.nextElementSibling.insertAdjacentHTML('afterend',html);
-    else { const first=scr&&scr.querySelector('.pb-card'); if(first) first.outerHTML=html; }
-  }catch(e){ console.warn(e); } return r; }; })(renderPublic);
-
-// ═══════════════════════════════════════════════════
-// FIX: several referee phones submitting at once (Live Sync)
-// While a phone was sending, the control room's updates for OTHER events arrived and replaced the phone's
-// own results with the (still empty) room copy — the phone then sent empty results. The referee's own event
-// (results, final flag) now stays on the phone until the control room has it.
-// ═══════════════════════════════════════════════════
-applyRemote=(function(orig){ return function(){
-  const c=getSync(); let keep=null;
-  if(c.role==='referee'&&_refEventId!=null){ const s0=getStore(), ev=eventById(s0,_refEventId);
-    if(ev){ const rows=s0.results[ev.name]; keep={id:ev.id,name:ev.name,rows:rows&&rows.length?JSON.parse(JSON.stringify(rows)):null,meta:(s0.resultsMeta||{})[ev.name]||null,status:ev.status,finalAt:ev.finalAt}; } }
-  const r=orig.apply(this,arguments);
-  if(keep){ const s=getStore(); let ch=false; const rm=(s.resultsMeta||{})[keep.name]; const remoteRows=s.results[keep.name]||[];
-    if(keep.rows&&(!remoteRows.length||((rm&&rm.at)||0)<((keep.meta&&keep.meta.at)||0))){ s.results[keep.name]=keep.rows; s.resultsMeta=s.resultsMeta||{}; if(keep.meta) s.resultsMeta[keep.name]=keep.meta; ch=true; }
-    const ev=eventById(s,keep.id); if(ev&&keep.status==='completed'&&ev.status!=='completed'){ ev.status='completed'; ev.finalAt=keep.finalAt; ch=true; }
-    if(ch){ _applyingRemote=true; try{ saveStore(s); }finally{ _applyingRemote=false; } } }
-  return r; }; })(applyRemote);
-// the result a referee submits is captured the moment SUBMIT is pressed (not a moment later)
-publishResults=(function(orig){ return function(s,ev,entries){ const r=orig.apply(this,arguments);
-  try{ if(getSync().role==='referee'&&getSync().mode==='firebase'){ const k=sessionStorage.getItem('ks_refkey_'+ev.id); if(k&&(s.results[ev.name]||[]).length) queue('inbox/'+ev.id+'/'+k,resultNode(s,ev)); } }catch(e){ console.warn(e); }
-  return r; }; })(publishResults);
-pushResult=(function(orig){ return function(ev){
-  // never let a later, emptier copy overwrite a submitted result that is still waiting to be sent
-  const c=getSync(); if(c.mode==='firebase'&&c.role==='referee'){ const k=sessionStorage.getItem('ks_refkey_'+ev.id), s=getStore();
-    if(k){ const o=outbox()['inbox/'+ev.id+'/'+k]; if(o&&(o.entries||[]).length&&!(s.results[ev.name]||[]).length) return; } }
-  return orig.apply(this,arguments); }; })(pushResult);
-
-// ═══════════════════════════════════════════════════
-// SMART TIME ENTRY — "1.50" in an 800m = 1:50, "1.50.20" = 1:50.20, "1 min 50 sec", "10 sec 50"
-// The "?" mark now appears only for times that are really impossible for the distance.
-// ═══════════════════════════════════════════════════
-function unitTime(t){ // words / units → "m:ss.cc" or "ss.cc"
-  const toks=t.match(/\d+(?:\.\d+)?\s*[a-z]*/g)||[]; let h=0,m=0,sec=null,frac='';
-  toks.forEach(tok=>{ const n=tok.match(/^(\d+(?:\.\d+)?)\s*([a-z]*)$/); if(!n) return; const v=n[1], u=n[2];
-    if(/^(h|hr|hrs|hour|hours)$/.test(u)) h=+v; else if(/^(m|min|mins|minute|minutes)$/.test(u)) m=+v;
-    else if(/^(s|sec|secs|second|seconds)$/.test(u)) sec=v;
-    else if(/^(ms|milli|millis|micro|micros|cs|hundredth|hundredths|centi|)$/.test(u)) frac=String(v).replace('.','').padStart(2,'0').slice(0,3); });
-  if(sec==null&&!m&&!h) return null;
-  let sv=sec==null?'0':String(sec); if(frac&&!sv.includes('.')) sv+='.'+frac;
-  const [si,sf]=sv.split('.'); const ss=(h||m)?String(si).padStart(2,'0'):String(+si);
-  return (h?h+':'+String(m).padStart(2,'0')+':':m?m+':':'')+ss+(sf?'.'+sf:''); }
-fmtTimeInput=(function(orig){ return function(v){
-  let t=String(v==null?'':v).trim(); if(!t) return orig(t);
-  const low=t.toLowerCase().replace(/,/g,'.');
-  if(/^(dnf|dns|dq|nm|x)$/.test(low)) return t;
-  if(/[a-z]/.test(low)){ const u=unitTime(low); if(u) return u; }
-  let m=low.match(/^(\d{1,2})(\d{2})(\d{2})(\d{2})$/); if(m&&+m[2]<60&&+m[3]<60) return `${+m[1]}:${m[2]}:${m[3]}.${m[4]}`;   // 1053000 → 1:05:30.00 (hours)
-  m=low.match(/^(\d{1,2})[.:](\d{2})[.:](\d{2})[.:](\d{1,3})$/); if(m&&+m[2]<60&&+m[3]<60) return `${+m[1]}:${m[2]}:${m[3]}.${m[4]}`; // 1.05.30.00
-  m=low.match(/^(\d{1,2})\.(\d{1,2})\.(\d{1,3})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2].padStart(2,'0')}.${m[3]}`;      // 1.50.20
-  m=low.match(/^(\d{1,2})[\s'"\-;]+(\d{1,2})[\s'"\-;.]+(\d{1,3})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2].padStart(2,'0')}.${m[3]}`; // 1 50 20
-  return orig(t.replace(/,/g,'.')); }; })(fmtTimeInput);
-function minuteReading(t){ // the same digits read as minutes : seconds
-  let m=t.match(/^(\d{1,2})\.(\d{2})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2]}`;
-  m=t.match(/^(\d{1,2})(\d{2})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2]}`;
-  m=t.match(/^(\d{1,2})[\s'"\-;]+(\d{1,2})$/); if(m&&+m[2]<60) return `${+m[1]}:${m[2].padStart(2,'0')}`;
-  return null; }
-function smartTime(raw,floor){ const t=String(raw==null?'':raw).trim().replace(/,/g,'.'); if(!t) return t;
-  const A=fmtTimeInput(t); if(!floor) return A; const ta=parseTime(A);
-  if(isNaN(ta)||ta>=floor) return A;
-  const B=minuteReading(t); if(B){ const tb=parseTime(B), max=floor*11/2.5; /* slower than 2.5 m/s is not a race time either */ if(!isNaN(tb)&&tb>=floor&&tb<=max) return B; }
-  return A; }
-buildTrackEntries=(function(orig){ return function(athletes,getVal){
-  const evName=athletes[0]&&athletes[0].event, floor=typeof minPlausibleTime==='function'?minPlausibleTime(evName):0;
-  return orig.call(this,athletes,a=>{ const v=getVal(a)||{}; const raw=String(v.result||'').trim(); if(!raw) return v; return Object.assign({},v,{result:smartTime(raw,floor)}); }); }; })(buildTrackEntries);
-
-// ═══════════════════════════════════════════════════
-// SCREEN NAVIGATION FIX — a clear way back from Big View (v17)
-// Big View now remembers where it was opened from (control panel / dashboard / home) and shows a
-// visible "◀ BACK" bar whenever the mouse moves or the screen is tapped; it hides again after a few
-// seconds so the audience sees a clean screen. The control room top bar gets a "📊 Dashboard"
-// button next to "📺 Big View" so ground screens can be switched back without opening Screen Control.
-// ═══════════════════════════════════════════════════
-let _fvFrom='led', _ledFrom='launcher', _fvHideT=null;
-function curScreen(){ if($('launcher')&&$('launcher').style.display!=='none') return 'launcher';
-  for(const n of ['admin','led','focus','waiting','referee','public','wall']) if(isActive(n+'-screen')) return n; return 'launcher'; }
-function screenLabel(n){ return n==='admin'?'CONTROL PANEL':n==='launcher'?'HOME':'DASHBOARD'; }
-showScreen=(function(orig){ return function(name){
-  const from=curScreen();
-  if(name==='focus'&&from!=='focus') _fvFrom=from==='admin'?'admin':(from==='launcher'&&getSync().role!=='display'&&!/[?&]view=/.test(location.search))?'launcher':'led';
-  if(name==='led'&&from!=='led'&&from!=='focus') _ledFrom=from==='admin'?'admin':'launcher';
-  const r=orig.apply(this,arguments);
-  if(name==='focus') fvNavRender(true);
-  if(name==='led') ledNavRender();
-  return r; }; })(showScreen);
-function fvBack(){ const to=_fvFrom; if(document.fullscreenElement&&to==='admin') document.exitFullscreen().catch(()=>{}); showScreen(to==='launcher'?'launcher':to); }
-function ledBack(){ const to=_ledFrom; if(document.fullscreenElement&&to==='admin') document.exitFullscreen().catch(()=>{}); showScreen(to); }
-function fvNavRender(flash){
-  const c=document.querySelector('#focus-screen .fv-ctrl'); if(!c) return;
-  const extra=_fvFrom==='led'?'':`<button onclick="showScreen('led')" title="LED dashboard">📊 DASHBOARD</button>`;
-  c.innerHTML=`<button class="fv-back" onclick="fvBack()" title="Back (Esc)">◀ BACK TO ${screenLabel(_fvFrom)}</button>${extra}
-    <button onclick="focusGo(-1);restartFocusTimer()" title="Previous (←)">◀</button><button id="fv-pause" onclick="focusPause()">${_fvPaused?'▶ PLAY':'⏸ PAUSE'}</button>
-    <button onclick="focusGo(1);restartFocusTimer()" title="Next (→)">▶</button><button onclick="toggleFullscreen()" title="Full screen (F)">⛶</button>`;
-  if(flash) fvShowCtrl(6000); }
-function ledNavRender(){ const b=document.querySelector('#led-screen .topbar button[onclick*="launcher"],#led-screen .topbar button.led-back'); if(!b) return;
-  b.classList.add('led-back'); b.setAttribute('onclick','ledBack()'); b.textContent=_ledFrom==='admin'?'← Control Panel':'← Back'; }
-function fvShowCtrl(ms){ const fs=$('focus-screen'); if(!fs) return; fs.classList.add('fv-show'); clearTimeout(_fvHideT); _fvHideT=setTimeout(()=>fs.classList.remove('fv-show'),ms||3500); }
-(function(){
-  const st=document.createElement('style');
-  st.textContent=`#focus-screen:not(.fv-show) .fv-ctrl{opacity:0;pointer-events:none} #focus-screen.fv-show .fv-ctrl,#focus-screen .fv-ctrl:hover{opacity:1}
-  #focus-screen .fv-ctrl{top:1vh;bottom:auto;left:1.5vw;right:auto;z-index:20;flex-wrap:wrap;background:rgba(0,0,0,.88);padding:8px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.6)}
-  #focus-screen .fv-ctrl .fv-back{background:#ea580c;border-color:#fdba74;font-size:16px;padding:8px 16px}
-  #focus-screen:not(.fv-show){cursor:none}
-  body.wall-frame #focus-screen .fv-ctrl{display:none!important}`;
-  document.head.appendChild(st);
-  const fs=$('focus-screen');
-  if(fs){ ['mousemove','pointerdown','touchstart'].forEach(ev=>fs.addEventListener(ev,()=>fvShowCtrl(),{passive:true})); }
-  document.addEventListener('keydown',e=>{
-    if(/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')) return;
-    if(isActive('focus-screen')){
-      if((e.key==='Escape'&&!document.fullscreenElement)||e.key==='Backspace'||e.key==='b'||e.key==='B'){ e.preventDefault(); e.stopImmediatePropagation(); fvBack(); return; }
-      if(e.key==='d'||e.key==='D'){ e.preventDefault(); showScreen('led'); return; }
-      fvShowCtrl();
-    } else if(isActive('led-screen')&&(e.key==='b'||e.key==='B')&&!e.ctrlKey){ showScreen('focus'); }
-  },true);
-  // control room top bar: Dashboard button beside Big View, current one highlighted
-  const big=document.querySelector('.admin-actions button[onclick="saveScreenSettings(\'focus\')"]');
-  if(big&&!$('ab-dash')){ big.id='ab-big'; big.insertAdjacentHTML('afterend','<button class="btn" id="ab-dash" onclick="saveScreenSettings(\'dashboard\')" title="Switch ground screens back to the Dashboard">📊 Dashboard</button>'); }
 })();
-function screensMark(){ const v=(getDisplay()||{}).view||'dashboard', a=$('ab-big'), b=$('ab-dash'); if(!a||!b) return;
-  a.classList.toggle('primary',v==='focus'); b.classList.toggle('primary',v!=='focus'); }
-saveScreenSettings=(function(orig){ return function(){ const r=orig.apply(this,arguments); screensMark(); return r; }; })(saveScreenSettings);
-renderAdmin=(function(orig){ return function(){ const r=orig.apply(this,arguments); screensMark(); return r; }; })(renderAdmin);
-
-// ═══════════════════════════════════════════════════
-// MULTI-LIVE TIMERS (v18) — every live event has its own stopwatch.
-// The main live event keeps the big timer (s.timerState). Each "also live" event gets its own timer in
-// s.evTimers[id] with ▶ Start / ⏸ Pause / ↺ Reset in Run of Show → "📺 Live on screens".
-// LED Dashboard, Big View (split + slideshow), referee phones and the public page show each event's own time.
-// ═══════════════════════════════════════════════════
-const EVT_ZERO={running:false,startMs:null,accumulated:0};
-function evTimerOf(s,id){ s=s||getStore(); id=Number(id); if(id===s.liveEventId) return _localTimer; return (s.evTimers||{})[id]||EVT_ZERO; }
-function evElapsed(s,id){ const t=evTimerOf(s,id); return t.running&&t.startMs?Math.max(0,syncNow()-t.startMs)+(t.accumulated||0):(t.accumulated||0); }
-function evTimerHtml(s,id,tag){ return `<span class="evt-t" data-evt="${Number(id)}">${fmtElapsed(evElapsed(s,id))}</span>`; }
-function evTimerSet(id,fn,msg,kind){ id=Number(id); const s=getStore(); if(id===s.liveEventId){ return; }
-  s.evTimers=s.evTimers||{}; const t=Object.assign({},EVT_ZERO,s.evTimers[id]||{}); const r=fn(t); if(r===false) return;
-  s.evTimers[id]=t; saveStore(s); if(msg) toast(msg,kind||'info'); if(typeof renderRunOfShow==='function'&&$('page-run')?.classList.contains('active')) renderRunOfShow(); }
-function evTimerStart(id){ const ev=eventById(getStore(),Number(id)); evTimerSet(id,t=>{ if(t.running){ toast('Timer already running','info'); return false; } t.running=true; t.startMs=syncNow(); },`⏱ ${ev?ev.name:''} — timer started`,'success'); }
-function evTimerPause(id){ evTimerSet(id,t=>{ if(!t.running) return false; t.accumulated=(t.accumulated||0)+Math.max(0,syncNow()-t.startMs); t.running=false; t.startMs=null; },'Timer paused','warning'); }
-function evTimerReset(id){ evTimerSet(id,t=>{ t.running=false; t.startMs=null; t.accumulated=0; },'Timer reset','info'); }
-function evTimerStop(s,id){ const t=(s.evTimers||{})[id]; if(t&&t.running){ t.accumulated=(t.accumulated||0)+Math.max(0,syncNow()-t.startMs); t.running=false; t.startMs=null; } }
-
-// main ↔ also-live swap keeps each event's own time
-setLiveEvent=(function(orig){ return function(id){
-  const s0=getStore(), oldMain=s0.liveEventId, oldT={..._localTimer}, newT=(s0.evTimers||{})[Number(id)];
-  const r=orig.apply(this,arguments); const s=getStore(); s.evTimers=s.evTimers||{}; let ch=false;
-  if(newT){ _localTimer={...EVT_ZERO,...newT}; s.timerState={..._localTimer}; delete s.evTimers[Number(id)]; ch=true; }
-  if(oldMain&&oldMain!==s.liveEventId&&(s.alsoLive||[]).includes(oldMain)&&(oldT.running||oldT.accumulated)){ s.evTimers[oldMain]={...oldT}; ch=true; }
-  if(ch) saveStore(s); return r; }; })(setLiveEvent);
-removeAlsoLive=(function(orig){ return function(id,finish){ const r=orig.apply(this,arguments); const s=getStore(), ev=eventById(s,Number(id));
-  if(ev&&(ev.status==='completed'||ev.status==='upcoming')&&(s.evTimers||{})[ev.id]){ if(ev.status==='upcoming') delete s.evTimers[ev.id]; else evTimerStop(s,ev.id); saveStore(s); }
-  return r; }; })(removeAlsoLive);
-
-// Run of Show: stopwatch buttons on every "also live" row
-multiLiveCard=(function(orig){ return function(){ let html=orig.apply(this,arguments); const s=getStore();
-  liveList(s).forEach(ev=>{ if(ev.id===s.liveEventId||ev.status==='completed') return; const t=evTimerOf(s,ev.id);
-    const ctl=`<span class="evt-ctl" style="display:inline-flex;gap:4px;align-items:center"><b style="font-family:'Teko',monospace;font-size:20px;min-width:92px;text-align:right;color:${t.running?'var(--green,#3fb950)':'#c9d1d9'}">${evTimerHtml(s,ev.id)}</b>
-      ${t.running?`<button class="btn xs warning" onclick="evTimerPause(${ev.id})">⏸ Pause</button>`:`<button class="btn xs primary" onclick="evTimerStart(${ev.id})">▶ Start</button>`}<button class="btn xs" onclick="evTimerReset(${ev.id})" title="Reset timer">↺</button></span>`;
-    html=html.replace(`<button class="btn xs" onclick="removeAlsoLive(${ev.id},true)">`,ctl+`<button class="btn xs" onclick="removeAlsoLive(${ev.id},true)">`); });
-  return html; }; })(multiLiveCard);
-
-// Big View: also-live slide + split columns show their own time
-buildFocusSlides=(function(orig){ return function(s){ const out=orig.apply(this,arguments); const L=screenList(s);
-  return out.map(sl=>{ let html=sl.html;
-    if(sl.key&&sl.key.indexOf('live:')===0){ const id=Number(sl.key.slice(5)), ev=eventById(s,id);
-      if(ev&&ev.status!=='completed') html=html.replace(/<div class="fv-timer"><small>ALSO LIVE<\/small><span>[^<]*<\/span><\/div>/,`<div class="fv-timer"><small>ALSO LIVE</small>${evTimerHtml(s,id)}</div>`); }
-    if(sl.key==='live'&&html.indexOf('fs-grid')>=0){ let k=0;
-      html=html.replace(/<div class="fs-col">([\s\S]*?)(<div class="fv-table"|<div class="fv-empty")/g,(m,head,tail)=>{ const ev=L.slice(0,4)[k++]; if(!ev||ev.id===s.liveEventId||ev.status==='completed'||head.indexOf('fv-timer')>=0) return m;
-        return `<div class="fs-col">${head}<div class="fv-timer">${evTimerHtml(s,ev.id)}</div>${tail}`; }); }
-    return html===sl.html?sl:Object.assign({},sl,{html}); }); }; })(buildFocusSlides);
-
-// LED Dashboard: when it shows an "also live" event, the big ELAPSED clock shows that event's time
-ledAltLive=(function(orig){ return function(){ const r=orig.apply(this,arguments); const s=getStore(), id=screenEventId(s), scr=$('led-screen');
-  if(scr){ const alt=scr.classList.contains('alt-live'), ev=alt?eventById(s,id):null; scr.classList.toggle('alt-timer',!!(ev&&ev.status!=='completed')); scr.dataset.altEv=alt&&ev?ev.id:''; }
-  return r; }; })(ledAltLive);
-updateTimerUI=(function(orig){ return function(){ const r=orig.apply(this,arguments); const scr=$('led-screen');
-  if(scr&&scr.classList.contains('alt-timer')&&scr.dataset.altEv) setText('d-elapsed',fmtElapsed(evElapsed(getStore(),scr.dataset.altEv)));
-  return r; }; })(updateTimerUI);
-
-// public page: ALSO LIVE cards get their own running time
-renderPublic=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ const s=getStore();
-  document.querySelectorAll('#public-screen .pb-card.pb-live').forEach(card=>{ if(card.querySelector('.evt-t')||!/ALSO LIVE/.test(card.querySelector('.pb-kick')?.textContent||'')) return;
-    const name=card.querySelector('.pb-title')?.textContent, ev=s.events.find(e=>e.name===name); if(!ev||ev.status==='completed') return;
-    card.insertAdjacentHTML('beforeend',`<div class="flex jcsb aic" style="margin-top:8px"><span class="pb-st live">LIVE</span><span class="pb-timer">${evTimerHtml(s,ev.id)}</span></div>`); }); }catch(e){ console.warn(e); } return r; }; })(renderPublic);
-
-// referee phone: an also-live event shows its own time, not the main event's
-setInterval(()=>{ const s=getStore();
-  document.querySelectorAll('.evt-t[data-evt]').forEach(el=>{ const t=fmtElapsed(evElapsed(s,el.dataset.evt)); if(el.textContent!==t) el.textContent=t; });
-  const rp=$('rp-elapsed'); if(rp&&typeof _refEventId!=='undefined'&&_refEventId!=null&&Number(_refEventId)!==s.liveEventId){ rp.id='rp-elapsed-ev'; rp.className='evt-t'; rp.dataset.evt=Number(_refEventId); rp.textContent=fmtElapsed(evElapsed(s,_refEventId)); }
-},150);
-
-// public phones also get each live event's own timer
-pubPayload=(function(orig){ return function(s){ const d=orig.apply(this,arguments); d.evTimers=s.evTimers||{}; d.alsoLive=s.alsoLive||[]; return d; }; })(pubPayload);
-applyPublicFeed=(function(orig){ return function(d){ const r=orig.apply(this,arguments); if(d&&(d.evTimers||d.alsoLive)){ const s=getStore(); s.evTimers=d.evTimers||{}; s.alsoLive=d.alsoLive||[];
-  _applyingRemote=true; try{ saveStore(s); }finally{ _applyingRemote=false; } if(isActive('public-screen')) renderPublic(); } return r; }; })(applyPublicFeed);
-(function(){ const st=document.createElement('style'); st.textContent='#led-screen.alt-live.alt-timer div:has(> #d-elapsed){visibility:visible}'; document.head.appendChild(st); })();
-
-// ═══════════════════════════════════════════════════
-// v19 — multi-live from the LIVE CONTROL page too + visible app version
-// Live Control (the first page of the control room) now shows every ALSO LIVE event under the main timer,
-// each with its own ▶ Start / ⏸ Pause / ↺ Reset. "Set Live Event" rows get a "➕ Also live" button, and
-// clicking another event while the main timer runs asks whether to keep both live.
-// ═══════════════════════════════════════════════════
-const KS_VERSION='v19';
-function lccAlsoHtml(){ const s=getStore(); const L=liveList(s).filter(e=>e.id!==s.liveEventId);
-  if(!L.length) return `<div style="font-size:12px;color:#8b949e;margin-top:10px">Race and field event at the same time? Use <b>➕ Also live</b> in the list below — each event gets its own timer.</div>`;
-  return `<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:10px"><div class="lcc-title" style="margin-bottom:6px">● Also live (${L.length}) — each has its own timer</div>`+
-    L.map(ev=>{ const t=evTimerOf(s,ev.id), fin=ev.status==='completed';
-      return `<div class="lcc-also-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0">
-        <span style="font-size:11px;padding:2px 7px;border-radius:5px;background:${fin?'#6e7681':'#1f6feb'};color:#fff">${fin?'FINISHED':'ALSO LIVE'}</span>
-        <b style="flex:1;min-width:150px;color:#e6edf3">${esc(ev.name)}</b>
-        <span style="font-family:'Share Tech Mono',monospace;font-size:22px;color:${t.running?'var(--green,#3fb950)':'var(--gold)'};min-width:110px;text-align:right">${evTimerHtml(s,ev.id)}</span>
-        ${fin?'':(t.running?`<button class="btn xs warning" onclick="evTimerPause(${ev.id})">⏸ Pause</button>`:`<button class="btn xs primary" onclick="evTimerStart(${ev.id})">▶ Start</button>`)+`<button class="btn xs" onclick="evTimerReset(${ev.id})">↺ Reset</button><button class="btn xs info" onclick="removeAlsoLive(${ev.id},true)">✓ Finish</button>`}
-        <button class="btn xs" onclick="removeAlsoLive(${ev.id},false)" title="Remove from live">✕</button></div>`; }).join('')+`</div>`; }
-function renderLccAlso(){ const card=document.querySelector('#page-control .live-control-card'); if(!card) return; let box=$('lcc-also');
-  if(!box){ card.insertAdjacentHTML('beforeend','<div id="lcc-also"></div>'); box=$('lcc-also'); } box.innerHTML=lccAlsoHtml(); }
-function controlLiveClick(id){ id=Number(id); const s=getStore(), cur=eventById(s,s.liveEventId), ev=eventById(s,id); if(!ev) return;
-  if(cur&&cur.id!==id&&cur.status!=='completed'&&ev.status!=='completed'&&ev.type!=='ceremony'&&!(s.alsoLive||[]).includes(id)){
-    if(confirm(`"${cur.name}" is LIVE now (timer ${fmtElapsed(elapsedMs())}).\n\nOK = keep BOTH live — "${ev.name}" becomes ALSO LIVE with its own timer\nCancel = switch — "${ev.name}" becomes the only live event`)) return addAlsoLive(id);
-  }
-  setLiveEvent(id); }
-renderEventPicker=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ const s=getStore(), also=s.alsoLive||[];
-  document.querySelectorAll('#a-event-picker > div').forEach(row=>{ const click=row.querySelector('div[onclick^="setLiveEvent("]'); if(!click) return;
-    const id=+(click.getAttribute('onclick').match(/\d+/)||[])[0]; const ev=eventById(s,id); if(!ev) return;
-    click.setAttribute('onclick',`controlLiveClick(${id})`);
-    row.querySelectorAll(`button[onclick="setLiveEvent(${id})"]`).forEach(bt=>{ bt.setAttribute('onclick',`event.stopPropagation();controlLiveClick(${id})`); if(also.includes(id)){ bt.textContent='⏱ Make main'; bt.title='Make this the main event (big timer)'; } });
-    const qr=row.querySelector('button[onclick^="showQrModal("]'); if(!qr||row.querySelector('.al-btn,.al-tag')) return;
-    if(also.includes(id)&&ev.status!=='completed'){ row.style.background='rgba(31,111,235,0.10)';
-      qr.insertAdjacentHTML('beforebegin',`<span class="al-tag" style="font-size:11px;color:#58a6ff;font-weight:700">ALSO LIVE · ${evTimerHtml(s,id)}</span>`); }
-    else if(id!==s.liveEventId&&ev.status!=='completed'&&ev.type!=='ceremony'&&s.liveEventId)
-      qr.insertAdjacentHTML('beforebegin',`<button class="btn xs al-btn" style="border-color:#1f6feb;color:#58a6ff" onclick="event.stopPropagation();addAlsoLive(${id})" title="Keep the current event live and add this one too">➕ Also live</button>`); });
-  renderLccAlso(); }catch(e){ console.warn(e); } return r; }; })(renderEventPicker);
-addAlsoLive=(function(orig){ return function(id){ const r=orig.apply(this,arguments); try{ renderEventPicker(); toast('Press ▶ Start next to it to run its own timer','info'); }catch(e){} return r; }; })(addAlsoLive);
-removeAlsoLive=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ renderEventPicker(); }catch(e){} return r; }; })(removeAlsoLive);
-evTimerSet=(function(orig){ return function(){ const r=orig.apply(this,arguments); try{ if($('page-control')?.classList.contains('active')) renderEventPicker(); }catch(e){} return r; }; })(evTimerSet);
-// screens update when another device changes the live list
-window.addEventListener('storage',()=>{ if(isActive('admin-screen')&&$('page-control')?.classList.contains('active')) setTimeout(renderLccAlso,50); });
-
-// Big View: a small "◀" tab always sits in the corner, so the way back is never invisible
-(function(){
-  const fs=$('focus-screen'); if(fs&&!$('fv-tab')) fs.insertAdjacentHTML('beforeend',`<button id="fv-tab" onclick="fvBack()" title="Back (Esc)">◀</button>`);
-  const st=document.createElement('style');
-  st.textContent=`#fv-tab{position:absolute;top:1vh;left:.6vw;z-index:19;width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.45);color:#fff;font-size:15px;opacity:.45;cursor:pointer}
-  #fv-tab:hover{opacity:1} #focus-screen.fv-show #fv-tab{display:none} body.wall-frame #fv-tab{display:none}
-  .ks-ver{font-size:11px;color:#8b949e;font-family:'Share Tech Mono',monospace;letter-spacing:1px}`;
-  document.head.appendChild(st);
-  // version label: launcher, control room, Big View bar
-  const lc=document.querySelector('#launcher .launcher-sub'); if(lc&&!lc.querySelector('.ks-ver')) lc.insertAdjacentHTML('beforeend',` <span class="ks-ver">· APP ${KS_VERSION}</span>`);
-  const ck=$('a-clock'); if(ck&&!$('a-ver')) ck.insertAdjacentHTML('afterend',`<span class="ks-ver" id="a-ver" title="App version">${KS_VERSION}</span>`);
-})();
-fvNavRender=(function(orig){ return function(){ const r=orig.apply(this,arguments); const c=document.querySelector('#focus-screen .fv-ctrl'); if(c&&!c.querySelector('.ks-ver')) c.insertAdjacentHTML('beforeend',`<span class="ks-ver" style="align-self:center;padding:0 6px">${KS_VERSION}</span>`); return r; }; })(fvNavRender);
 
 handleUrlParams();
-</script>
-<!-- PWA: offline + install. Only runs when hosted (http/https), never from a local file. -->
-<script>
-(function(){
-  if(!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
-  function showUpdate(){
-    if(document.getElementById('pwa-update')) return;
-    var b=document.createElement('div');
-    b.id='pwa-update';
-    b.textContent='Naya version ready hai — tap karke refresh karein';
-    b.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483647;background:#ff6b00;color:#000;font:700 16px Barlow Condensed,Arial,sans-serif;padding:10px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.5);cursor:pointer';
-    b.onclick=function(){ location.reload(); };
-    document.body.appendChild(b);
-  }
-  window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js').then(function(reg){
-      reg.addEventListener('updatefound', function(){
-        var w=reg.installing; if(!w) return;
-        w.addEventListener('statechange', function(){
-          if(w.state==='installed' && navigator.serviceWorker.controller) showUpdate();
-        });
-      });
-      setInterval(function(){ reg.update().catch(function(){}); }, 10*60*1000);
-    }).catch(function(e){ console.warn('SW register failed', e); });
-  });
-})();
 </script>
 </body>
 </html>
